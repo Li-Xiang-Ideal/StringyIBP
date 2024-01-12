@@ -8,11 +8,7 @@ StringyIBP$Version={"0.0.4","2024.1.10"};
 
 (* Introduction to StringyIBP *)
 
-(* This package contains a branch of functions which may help you to solve linear equations more efficiently.
-   e.g. You may encounter an equation in form of p\:2081(a[1],...,a[n])x\:2081+...+p\:1d62(a[1],...,a[n])x\:1d62==0,where p\:2081,...,p\:1d62 are polynomials and a[1],...,a[n] are independent variables.
-   Such equation could be difficult to solve with Solve,Reduce,etc.. But now you may use ReduceToLinear to reduce it into linear equations with numeric coeffecient.
-   
-   Functions Part II linear algebra of this package is written by Buwai Li a.k.a. Zhenjie Li,see doubilee.com for details. Some of the functions are slightly modified or optimized.
+(* To be completed...
 *)
 
 
@@ -41,7 +37,7 @@ ParallelReplace::usage="ParallelReplace[expr,rules,levelspec:All,piecelength:500
 
 
 (* Data *)
-Protect[X,c,y,u,int];
+Protect[X,c,y,u,int,intFF];
 
 
 (* Conventions *)
