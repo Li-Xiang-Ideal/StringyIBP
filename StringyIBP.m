@@ -14,10 +14,8 @@ StringyIBP$Version={"0.0.4","2024.1.10"};
 
 (* Update notes *)
 
-(* 0.0.1  2023.3.2   Add this package
-   0.0.2  2023.3.3   1.Add Method option for ParallelExpand and ParallelReplace,now you may specify Method->"CoarsestGrained" or Method->"FinestGrained".
-                     2.Use Dispatch to improve efficiency of some functions.
-                     3.Add MySlowSolve to solve nonhomogeneous linear equations.
+(* 0.0.1  2023.6.7   Add Part I~III of this package.
+   0.0.2  2023.6.27  Add Part IV for loop integrand.
    0.0.3  2023.8.30  Change default triangulation.
    0.0.4  2024.1.10  1.Add StringyReductionDataFF$X.
                      2.Use Options to specify certain parameters.
@@ -27,7 +25,7 @@ StringyIBP$Version={"0.0.4","2024.1.10"};
 (************************ 1. Begin package ***********************)
 
 
-Print["Package StringyIBP version ",StringyIBP$Version[[1]],",",StringyIBP$Version[[2]]];
+Print["Package StringyIBP version ",StringyIBP$Version[[1]],", ",StringyIBP$Version[[2]]];
 
 
 (* Functions *)
