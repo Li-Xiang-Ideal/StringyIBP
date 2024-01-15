@@ -95,7 +95,7 @@ Xtri$Default[n_,OptionsPattern[Options[Xtri$Default]]]:=With[{X=OptionValue["X"]
 Options[Xvars]={"X"->X};
 Options[Xcvars]={"X"->X,"c"->c,"Triangulation"->{}};
 Xvars[n_,OptionsPattern[Options[Xvars]]]:=With[{X=OptionValue["X"]},DeleteCases[Table[Subscript[X,a,b],{a,1,n},{b,a+2,n}]//Flatten,Subscript[X,1,n]]]
-Xcvars[n_,opts:OptionsPattern[Options[Xcvars]]]:=With[{X=OptionValue["X"],c=OptionValue["c"],Xi=Init[OptionValue["Triangulation"],Xtri$Default[n,PassOptions[opts,Xtri$Default]]],del$c=$GlobalConventions$DeletedCij$},Join[Xi,Sort[Complement[Xvars[n,"X"->c],Xi/.Subscript[X, i_,j_]:>Subscript[c, Mod[i+del$c,n,1],Mod[j+del$c,n,1]]/.Subscript[c, i_,j_]/;i>j:>Subscript[c, j,i]]]]]
+Xcvars[n_,opts:OptionsPattern[Options[Xcvars]]]:=With[{X=OptionValue["X"],c=OptionValue["c"],Xi=Init[OptionValue["Triangulation"],Xtri$Default[n,PassOptions[opts,Xtri$Default]]],del$c=$GlobalConventions$DeletedCij$},Join[Xi,Sort[Complement[Xvars[n,"X"->c],Xi/.Subscript[X,i_,j_]:>Subscript[c,Mod[i+del$c,n,1],Mod[j+del$c,n,1]]/.Subscript[c,i_,j_]/;i>j:>Subscript[c,j,i]]]]]
 
 
 Options[Xcal]={"X"->X};
@@ -114,8 +114,8 @@ int$XtoXc[expr_,OptionsPattern[Options[int$XtoXc]]]:=(expr/.{integral_int:>Modul
 int@@Xcvars[n,Xtri]/.ctoX[n]/.Rule@@@({Xvars[n],List@@integral}\[Transpose])/.Xtoc[n,Xtri]]]})
 
 
-XctoPattern={Subscript[X, i_,j_]:>ToExpression["X"<>ToString[i]<>ToString[j]<>"_"],Subscript[c, i_,j_]:>ToExpression["c"<>ToString[i]<>ToString[j]<>"_"]};
-XctoVarName={Subscript[X, i_,j_]:>ToExpression["X"<>ToString[i]<>ToString[j]],Subscript[c, i_,j_]:>ToExpression["c"<>ToString[i]<>ToString[j]]};
+XctoPattern={Subscript[X,i_,j_]:>ToExpression["X"<>ToString[i]<>ToString[j]<>"_"],Subscript[c,i_,j_]:>ToExpression["c"<>ToString[i]<>ToString[j]<>"_"]};
+XctoVarName={Subscript[X,i_,j_]:>ToExpression["X"<>ToString[i]<>ToString[j]],Subscript[c,i_,j_]:>ToExpression["c"<>ToString[i]<>ToString[j]]};
 XctoPatternIf[Xij_Subscript,cond_]:=Prepend[XctoPattern,Xij:>ToExpression[StringJoin[#,"_Plus/;MemberQ[",#,",_Integer?(",ToString[cond],")]"]&@(ToString/@List@@Xij)]]
 
 
@@ -127,7 +127,7 @@ Xc$cyclicPerm[expr_,n_,k_]:=Nest[(#/.{Subscript[X,a_,b_]:>Subscript[X,Mod[a+1,n,
 Options[intXshift$cutoff]={"cutoff"->{1,True}};
 intXshift$cutoff[inteq_,OptionsPattern[Options[intXshift$cutoff]]]:=With[{k=OptionValue["cutoff"][[1]],tag=OptionValue["cutoff"][[2]]},
 If[TrueQ@tag,Max[Count[#,k+1+Subscript[X,__],\[Infinity]]&/@Cases[inteq,_int,\[Infinity]]]<=1&&FreeQ[inteq,int[___,Subscript[X,__]+m_Integer/;m<0||m>k+1,___]],FreeQ[inteq,int[___,Subscript[X,__]+m_Integer/;m<0||m>k,___]]]]
-intXshift$sort[inteq_]:=Flatten[({Max@@#,Plus@@#}&/@{DeleteCases[Plus@@@Cases[{inteq},_int,\[Infinity]],Subscript[X,__],\[Infinity]],Cases[DeleteCases[Cases[{inteq},_int,\[Infinity]],Subscript[X,__],\[Infinity]],_Integer,\[Infinity]]})\[Transpose]]
+intXshift$sort[inteq_]:=With[{shifts=List@@@DeleteCases[Cases[{inteq},_int,\[Infinity]],Subscript[X,__],\[Infinity]]},{Max@@Plus@@@shifts,Max@@Max@@@shifts,Plus@@Flatten[shifts],Plus@@Flatten[shifts]}]
 
 
 Options[SelectStringyEquations$noshift]={"Triangulation"->{}};
@@ -138,7 +138,7 @@ SelectStringyEquations$AscendX[eqs_List,Xij_]:=With[{n=(3+Sqrt[9+8 Length[Extrac
 
 Options[utoyRules]={"Triangulation"->{}};
 utoyRules[n_,OptionsPattern[Options[utoyRules]]]:=Once[With[{Xi=Init[OptionValue["Triangulation"],Xtri$Default[n]],del$c=$GlobalConventions$DeletedCij$},
-Module[{xvar=Complement[Xvars[n],Xi],cvar=Complement[Xvars[n,"X"->c],Xi/.Subscript[X, i_,j_]:>Subscript[c, Mod[i+del$c,n,1],Mod[j+del$c,n,1]]/.Subscript[c, i_,j_]/;i>j:>Subscript[c, j,i]],sol,ytou,ueqs},
+Module[{xvar=Complement[Xvars[n],Xi],cvar=Complement[Xvars[n,"X"->c],Xi/.Subscript[X,i_,j_]:>Subscript[c,Mod[i+del$c,n,1],Mod[j+del$c,n,1]]/.Subscript[c,i_,j_]/;i>j:>Subscript[c,j,i]],sol,ytou,ueqs},
 sol=Solve[(cvar/.Subscript[c,i_,j_]:>Subscript[X,i,j]+Subscript[X,i+1,j+1]-Subscript[X,i,j+1]-Subscript[X,i+1,j]//.Xcal[n])==0,xvar][[1]]/.X->u;
 ytou=Table[Subscript[y,i]==#[[i]]Product[sol[[j,1]]^Coefficient[sol[[j,2]],#[[i]]],{j,1,Length@sol}],{i,1,Length@#}]&@(Xi/.X->u);
 ueqs=Table[uij/.Subscript[u,i_,j_]:>(1-Subscript[u,i,j]==Product[Subscript[u,k,l],{k,i+1,j-1},{l,Range[i-1]~Join~Range[j+1,n]}])/.
@@ -148,10 +148,10 @@ Solve[ytou~Join~ueqs,Xvars[n,"X"->u]][[1]]]]]
 
 Options[ytozRules]={"Triangulation"->{}};
 ytozRules[n_,OptionsPattern[Options[ytozRules]]]:=Once[With[{Xi=Init[OptionValue["Triangulation"],Xtri$Default[n]],del$c=$GlobalConventions$DeletedCij$},Module[{xvar=Complement[Xvars[n],Xi],
-cvar=Complement[Xvars[n,"X"->c],Xi/.Subscript[X, i_,j_]:>Subscript[c, Mod[i+del$c,n,1],Mod[j+del$c,n,1]]/.Subscript[c, i_,j_]/;i>j:>Subscript[c, j,i]],sol,ytou,ueqs},
+cvar=Complement[Xvars[n,"X"->c],Xi/.Subscript[X,i_,j_]:>Subscript[c,Mod[i+del$c,n,1],Mod[j+del$c,n,1]]/.Subscript[c,i_,j_]/;i>j:>Subscript[c,j,i]],sol,ytou,ueqs},
 sol=Solve[(cvar/.Subscript[c,i_,j_]:>Subscript[X,i,j]+Subscript[X,i+1,j+1]-Subscript[X,i,j+1]-Subscript[X,i+1,j]//.Xcal[n])==0,xvar][[1]]/.X->u;
 ytou=Table[Subscript[y,i]->#[[i]]Product[sol[[j,1]]^Coefficient[sol[[j,2]],#[[i]]],{j,1,Length@sol}],{i,1,Length@#}]&@(Xi/.X->u);
-ytou/.Subscript[u, i_,j_]:>(Subscript[z, i-1]-Subscript[z, j])(Subscript[z, i]-Subscript[z, j-1])/((Subscript[z, i]-Subscript[z, j])(Subscript[z, i-1]-Subscript[z, j-1]))/.Subscript[z, i_]:>Subscript[z, Mod[i,n,1]]//Cancel]]]
+ytou/.Subscript[u,i_,j_]:>(Subscript[z,i-1]-Subscript[z,j])(Subscript[z,i]-Subscript[z,j-1])/((Subscript[z,i]-Subscript[z,j])(Subscript[z,i-1]-Subscript[z,j-1]))/.Subscript[z,i_]:>Subscript[z,Mod[i,n,1]]//Cancel]]]
 
 
 Options[StringyIntegrand$X]={"Triangulation"->{}};
