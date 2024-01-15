@@ -197,23 +197,23 @@ Table[eq/.Apply[Rule,{Xvars[n],Xvars[n]+#}\[Transpose]&/@Tuples[Range[0,k],n (n-
 StringyIdentity$X$All[n_,opts:OptionsPattern[Options[StringyIdentity$X$All]]]:=Once[DeleteDuplicates[Table[Xc$cyclicPerm[Once[StringyIdentity$X$shift[n,opts]],n,m],{m,0,n-1}]//Flatten]]
 
 
-Options[intXs$List]={"cutoff"->{1,True}};
-intXs$List[n_,opts:OptionsPattern[Options[intXs$List]]]:=Once[With[{k=OptionValue["cutoff"][[1]]},SortBy[Select[int@@@(Xvars[n]+#&/@Tuples[Range[0,k+1],n (n-3)/2]),intXshift$cutoff[#,opts]&],intXshift$sort]]]
+Options[intXs$List]={"cutoff"->{1,True},"Sort Funtion"->intXshift$sort};
+intXs$List[n_,opts:OptionsPattern[Options[intXs$List]]]:=Once[With[{k=OptionValue["cutoff"][[1]]},SortBy[Select[int@@@(Xvars[n]+#&/@Tuples[Range[0,k+1],n (n-3)/2]),intXshift$cutoff[#,PassOptions[opts,intXshift$cutoff]]&],OptionValue["Sort Funtion"]]]]
 
 
-Options[StringyReductionDataFF$X]={"Triangulation"->{},"cutoff"->{1,True},"F Polynomial"->StringyPolynomial,"Extra Equations"->{},"Sort Funtion"->Null,"intFF"->intFF};
-StringyReductionDataFF$X[n_,opts:OptionsPattern[Options[StringyReductionDataFF$X]]]:=With[{intXs=If[OptionValue["Sort Funtion"]===Null,#,SortBy[#,OptionValue["Sort Funtion"]]]&@intXs$List[n,PassOptions[opts,intXs$List]],XctoVarName$FF=Dispatch[#->(#/.XctoVarName)&/@Xvars[n]],intFF=OptionValue["intFF"]},
+Options[StringyReductionDataFF$X]={"Triangulation"->{},"cutoff"->{1,True},"F Polynomial"->StringyPolynomial,"Extra Equations"->{},"Sort Funtion"->intXshift$sort,"intFF"->intFF};
+StringyReductionDataFF$X[n_,opts:OptionsPattern[Options[StringyReductionDataFF$X]]]:=With[{intXs=intXs$List[n,PassOptions[opts,intXs$List]],XctoVarName$FF=Dispatch[#->(#/.XctoVarName)&/@Xvars[n]],intFF=OptionValue["intFF"]},
 With[{intXtoFF=Table[intXs[[$i]]->intFF[$i],{$i,Length[intXs]}]},{{Collect[#,_intFF]&/@(Join[#==0&/@StringyIdentity$X$All[n,PassOptions[opts,StringyIdentity$X$All]],List@@OptionValue["Extra Equations"]]/.Dispatch[intXtoFF]),Reverse[intXtoFF[[All,2]]],"Parameters"->Xvars[n],"VarsPattern"->(Union[Cases[{#},_intFF,Infinity]]&)},Reverse/@intXtoFF}/.XctoVarName$FF]]
 
 
-Options[StringyReduction$X]={"Triangulation"->{},"cutoff"->{1,True},"F Polynomial"->StringyPolynomial};
-Options[StringyRelations$X]={"Triangulation"->{},"cutoff"->{1,True},"F Polynomial"->StringyPolynomial};
-StringyReduction$X[n_,opts:OptionsPattern[Options[StringyReduction$X]]]:=Once[DeleteCases[RowReduce[Once[Reverse[Coefficient[#,intXs$List[n,PassOptions[opts,intXs$List]]]]&/@StringyIdentity$X$All[n,opts]]]//Simplify,{0..}]]
+Options[StringyReduction$X]={"Triangulation"->{},"cutoff"->{1,True},"F Polynomial"->StringyPolynomial,"Sort Funtion"->intXshift$sort};
+Options[StringyRelations$X]={"Triangulation"->{},"cutoff"->{1,True},"F Polynomial"->StringyPolynomial,"Sort Funtion"->intXshift$sort};
+StringyReduction$X[n_,opts:OptionsPattern[Options[StringyReduction$X]]]:=Once[DeleteCases[RowReduce[Once[Reverse[Coefficient[#,intXs$List[n,PassOptions[opts,intXs$List]]]]&/@StringyIdentity$X$All[n,PassOptions[opts,StringyIdentity$X$All]]]]//Simplify,{0..}]]
 StringyRelations$X[n_,opts:OptionsPattern[Options[StringyRelations$X]]]:=Once[(coeff|->FirstCase[#,{1,_}][[2]]==-Plus@@Times@@@Cases[#,Except[{0,_}]][[2;;]]&@({coeff,Reverse[intXs$List[n,PassOptions[opts,intXs$List]]]}\[Transpose]))/@StringyReduction$X[n,opts]]
 
 
 Options[StringyAscendRules$X]={"Triangulation"->{},"cutoff"->{1,True},"F Polynomial"->StringyPolynomial};
-Options[StringyDescendRules$X]={"Triangulation"->{},"cutoff"->{1,True},"F Polynomial"->StringyPolynomial};
+Options[StringyDescendRules$X]={"Triangulation"->{},"cutoff"->{1,True},"F Polynomial"->StringyPolynomial,"Sort Funtion"->intXshift$sort};
 StringyAscendRules$X[n_,opts:OptionsPattern[Options[StringyAscendRules$X]]]:=Once[Table[RuleDelayed@@{#[[1]]/.XctoPatternIf[Xij,Negative],#[[2]]/.XctoVarName}&@SelectStringyEquations$AscendX[Equal@@Solve[#,int@@Xvars[n]][[1,1]]&/@
 Select[#==0&/@StringyIdentity$X$All[n,opts],MemberQ[#,int@@Xvars[n],\[Infinity]]&],Xij][[1]],{Xij,Xvars[n]}]]
 StringyDescendRules$X[n_,opts:OptionsPattern[Options[StringyDescendRules$X]]]:=Once[(RuleDelayed@@{#1[[1]]/.#2/.XctoPatternIf[#2[[1,1]],(m|->(#>m&))[#3]],#1[[2]]/.#2/.XctoVarName}&)@@@

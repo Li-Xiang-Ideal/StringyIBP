@@ -151,5 +151,5 @@ Pause[3];(* error may occur without this pause *)%[[-1]]
 Length[DeleteCases[%,0]]-1(* 6 master integral *)
 
 
-StringyReductionDataFF$X[6,False]
+StringyReductionDataFF$X[6]
 Export["StringyIBPtoSolve6pt.mx",ffSparseSolve@@%[[1]]]
