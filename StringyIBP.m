@@ -127,7 +127,7 @@ Xc$cyclicPerm[expr_,n_,k_]:=Nest[(#/.{Subscript[X,a_,b_]:>Subscript[X,Mod[a+1,n,
 Options[intXshift$cutoff]={"cutoff"->{1,True}};
 intXshift$cutoff[inteq_,OptionsPattern[Options[intXshift$cutoff]]]:=With[{k=OptionValue["cutoff"][[1]],tag=OptionValue["cutoff"][[2]]},
 If[TrueQ@tag,Max[Count[#,k+1+Subscript[X,__],\[Infinity]]&/@Cases[inteq,_int,\[Infinity]]]<=1&&FreeQ[inteq,int[___,Subscript[X,__]+m_Integer/;m<0||m>k+1,___]],FreeQ[inteq,int[___,Subscript[X,__]+m_Integer/;m<0||m>k,___]]]]
-intXshift$sort[inteq_]:=With[{shifts=List@@@DeleteCases[Cases[{inteq},_int,\[Infinity]],Subscript[X,__],\[Infinity]]},{Max@@Plus@@@shifts,Max@@Max@@@shifts,Plus@@Flatten[shifts],Plus@@Flatten[shifts]}]
+intXshift$sort[inteq_]:=With[{shifts=Abs[List@@@DeleteCases[Cases[{inteq},_int,\[Infinity]],Subscript[X,__],\[Infinity]]]},{Max@@Plus@@@shifts,Max@@Max@@@shifts,Plus@@Flatten[shifts],Plus@@Flatten[shifts]}]
 
 
 Options[SelectStringyEquations$noshift]={"Triangulation"->{}};
@@ -182,7 +182,7 @@ IBP$Identity$X[n_,k_,opts:OptionsPattern[Options[IBP$Identity$X]]]:=int$XctoX[IB
 
 
 Options[CheckStringyIdentity]={"Triangulation"->{}};
-CheckStringyIdentity[id_,opts:OptionsPattern[Options[CheckStringyIdentity]]]:=With[{n=(3+Sqrt[9+8 Length[Cases[id,_int,\[Infinity]][[1]]]])/2,IBPtag=Cases[id//Simplify,_int Subscript[X,__],\[Infinity]]},With[{Xi=Init[OptionValue["Triangulation"],Xtri$Default[n]],
+CheckStringyIdentity[id_,opts:OptionsPattern[Options[CheckStringyIdentity]]]:=With[{n=(3+Sqrt[9+8 Length[Cases[id,_int,\[Infinity]][[1]]]])/2,IBPtag=Cases[id//Simplify,_int*Subscript[X,__],\[Infinity]]},With[{Xi=Init[OptionValue["Triangulation"],Xtri$Default[n]],
 intXRule=RuleDelayed@@{int@@Xvars[n]/.XctoPattern,StringyIntegrand$X[n,opts]/.XctoVarName}},With[{intXcRule=RuleDelayed@@{int@@Xcvars[n,opts]/.XctoPattern,StringyIntegrand$Xc[n,opts]/.XctoVarName},yi=Subscript[y,Position[Xi,#][[1,1]]]&},
 If[MemberQ[id,int[___,Subscript[c,__]],\[Infinity]],(id/.intXcRule)-If[IBPtag=!={},D[yi@IBPtag[[1,-1]]StringyIntegrand$Xc[n,opts],yi@IBPtag[[1,-1]]],0],
 (id/.intXRule)-If[IBPtag=!={},D[yi@IBPtag[[1,-1]]StringyIntegrand$X[n,opts],yi@IBPtag[[1,-1]]],0]]==0//Simplify]]]
