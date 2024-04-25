@@ -3,7 +3,7 @@
 (************************ 0. Info and copyright ***********************)
 
 
-StringyIBP$Version={"0.0.4","2024.1.10"};
+StringyIBP$Version={"0.0.5","2024.4.25"};
 
 
 (* Introduction to StringyIBP *)
@@ -19,6 +19,8 @@ StringyIBP$Version={"0.0.4","2024.1.10"};
    0.0.3  2023.8.30  Change default triangulation.
    0.0.4  2024.1.10  1.Add StringyReductionDataFF$X.
                      2.Use Options to specify certain parameters.
+   0.0.5  2024.4.25  1.Add scaffolding.
+                     2.Use Dn\[Infinity] instead of Dn.
 *)
 
 
@@ -229,32 +231,33 @@ StringyIdentity$X$All[n,PassOptions[opts,StringyIdentity$X$All]]]/.Table[Xij->Ra
 (************************ 5. Functions Part IV ***********************)
 
 
-FeynGraph$1Loop[n_]:=Once[Graph[Join[Table[Labeled[Subscript["V",i]\[UndirectedEdge]Subscript["V",Mod[i-1,n,1]],Subscript["y",i]],{i,n}],Table[Subscript["p",i]\[UndirectedEdge]Subscript["V",i],{i,n}]],VertexLabels->"Name"]]
+Options[FeynGraph$1Loop]={"Scaffolding"->False};
+FeynGraph$1Loop[n_,OptionsPattern[Options[FeynGraph$1Loop]]]:=Once[Graph[Join[Table[Labeled[Subscript["V",i]\[UndirectedEdge]Subscript["V",Mod[i-1,n,1]],Subscript["y",i]],{i,n}],Table[Subscript["p",i]\[UndirectedEdge]Subscript["V",i],{i,n}]],VertexLabels->"Name"]]
 
 
-uPath[n_Integer,i_Integer,j_Integer]:=Once[If[i!=j,Cases[FindPath[FeynGraph[n],Subscript["p",i],Subscript["p",j],\[Infinity],All],{___,Subscript["V",a_],Subscript["V",b_],___}/;b==a+1][[1]],
-If[FreeQ[#,{___,Subscript["V",a_],Subscript["V",b_],___}/;b==a+1],Reverse[#],#]&@Join[{Subscript["p",i]},RotateLeft[#,Position[#,Subscript["V",i]\[UndirectedEdge]_][[1,1]]-1]&@
-FindCycle[{FeynGraph$1Loop[n],Subscript["V",i]},\[Infinity],All][[1]]/.UndirectedEdge->Sequence,{Subscript["p",i]}]//.{a___,b_,b_,c___}:>{a,b,c}]]
+Options[FeynGraph$1Loop]={"Scaffolding"->False};
+FeynGraph$1Loop[n_Integer,OptionsPattern[Options[FeynGraph$1Loop]]]:=With[{circleLayout=({r,m,\[Theta],del}|->Delete[Table[{r Cos[2\[Pi] i/m+\[Theta]],-r Sin[2\[Pi] i/m+\[Theta]]},{i,0,m-1}],del])},If[OptionValue["Scaffolding"],
+Once[Graph[Join[Table[Subscript["p",i],{i,2n}],Table[Subscript["p",2i-1,2i],{i,n}],Table[Subscript["V",i],{i,n}]],Join[Table[Labeled[Subscript["V",Mod[-1+i,n,1]]\[DirectedEdge]Subscript["V",i],Subscript[y,i]],{i,n}],Table[Labeled[Subscript["p",2 i-1]\[UndirectedEdge]Subscript["p",2i-1,2 i],Subscript[y,2 i-1,Mod[2 i,2 n,1]]],{i,n}],Table[Labeled[Subscript["p",2 i]\[UndirectedEdge]Subscript["p",2 i-1,2 i],Subscript[y,2 i,Mod[2 i+1,2 n,1]]],{i,n}],Table[Labeled[Subscript["p",2 i-1,2 i]\[UndirectedEdge]Subscript["V",i],Subscript[y,2 i-1,Mod[2 i+1,2 n,1]]],{i,n}]],VertexLabels->"Name",VertexCoordinates->Join[circleLayout[7/2,3n,-\[Pi]/(3n),List/@(3Range[n])],circleLayout[5/2,n,0,{}],circleLayout[1,n,0,{}]]]],
+Once[Graph[Join[Table[Subscript["p",i],{i,n}],Table[Subscript["V",i],{i,n}]],Join[Table[Labeled[Subscript["V",Mod[i-1,n,1]]\[DirectedEdge]Subscript["V",i],Subscript[y,i]],{i,n}],Table[Labeled[Subscript["p",i]\[UndirectedEdge]Subscript["V",i],Subscript[y,i,Mod[i+1,n,1]]],{i,n}]],VertexLabels->"Name",VertexCoordinates->Join[circleLayout[5/2,n,0,{}],circleLayout[1,n,0,{}]]]]]]
 
 
-uijPolynomial[n_Integer,i_Integer,j_Integer]:=Once[#[[1,2]]#[[2,1]]/(#[[1,1]]#[[2,2]])&@(Dot@@Table[{#[[k-1]],#[[k]]}/.{{Subscript["V",a_],Subscript["p",_]}:>{{Subscript[y,a],Subscript[y,a]},{0,1}},
-{Subscript["V",a_],Subscript["V",b_]}:>{{Subscript[y,a],0},{1,1}},{Subscript["p",a_],Subscript["V",_]}:>{{1,1},{0,1}}},{k,2,Length[#]}]&@Delete[uPath[n,i,j],2])]
+Options[uPath]={"Scaffolding"->False,"Ordering"->"Clockwise"};
+uPath[n_Integer,i_Integer,j_Integer,opts:OptionsPattern[Options[uPath]]]:=Once[With[{thisVi=If[OptionValue["Scaffolding"],Ceiling[i/2],i],ReverseOrNot=If[OptionValue["Ordering"]==="Clockwise",{},{"Left"->"Right","Right"->"Left"}],ifcycle=(i==j||(i-j==1&&EvenQ[i]&&OptionValue["Scaffolding"])),graph=Once[ToExpression["List"<>StringTake[FullForm[FeynGraph$1Loop[n,PassOptions[opts,FeynGraph$1Loop]]]//ToString,{6,-1}]]/.If[OptionValue["Ordering"]==="Clockwise",{},V1_\[DirectedEdge]V2_:>V2\[DirectedEdge]V1]]},
+With[{edges=Once[List@@@graph[[3,1,2]]],pointPath=Once[If[!ifcycle,FindPath[Once[Graph@@graph],Subscript["p",i],Subscript["p",j],\[Infinity],All][[1]],If[FreeQ[#,{___,Subscript["V",a_],Subscript["V",b_],___}/;Mod[b-a-If[OptionValue["Ordering"]==="Clockwise",1,-1],n]==0],Reverse[#],#]&@Join[{Subscript["p",i],If[OptionValue["Scaffolding"],If[OddQ[i],Subscript["p",i,i+1],Subscript["p",i-1,i]],Nothing]},RotateLeft[#,Position[#,Subscript["V",thisVi]\[UndirectedEdge]_][[1,1]]-1]&@FindCycle[{Once[Graph@@(graph/.DirectedEdge->UndirectedEdge)],Subscript["V",thisVi]},\[Infinity],All][[1]]/.UndirectedEdge->Sequence,{If[OptionValue["Scaffolding"],If[OddQ[j],Subscript["p",j,j+1],Subscript["p",j-1,j]],Nothing],Subscript["p",j]}]//.{a___,b_,b_,c___}:>{a,b,c}]],
+LeftOrRight=({#1,#2,Switch[#2,{Subscript["p",a_],Subscript["p",a_,b_],Subscript["V",_]},"Right",{Subscript["p",b_],Subscript["p",a_,b_],Subscript["V",_]},"Left",{Subscript["p",__],Subscript["V",_],Subscript["V",_]},"Left"/.ReverseOrNot,{Subscript["V",_],Subscript["V",_],Subscript["V",_]},"Right"/.ReverseOrNot,{Subscript["V",_],Subscript["V",_],Subscript["p",__]},"Left"/.ReverseOrNot,{Subscript["V",_],Subscript["p",a_,b_],Subscript["p",a_]},"Left",{Subscript["V",_],Subscript["p",a_,b_],Subscript["p",b_]},"Right",{Subscript["p",a_],Subscript["p",a_,b_],Subscript["p",b_]},"Left",{Subscript["p",b_],Subscript["p",a_,b_],Subscript["p",a_]},"Right",_,"Fixed"]}&)},
+Table[LeftOrRight@@{Cases[Once[Union[edges,{Reverse[#[[1]]],#[[2]]}&/@Cases[edges,{_UndirectedEdge,_}]]],{_[pointPath[[$i]],pointPath[[$i+1]]],_}][[1,2]],If[$i<Length[pointPath]-1,{pointPath[[$i]],pointPath[[$i+1]],pointPath[[$i+2]]},{}]},{$i,Length[pointPath]-1}]]]]
+uPath[n_Integer,SuperPlus[i_]|SuperMinus[j_],opts:OptionsPattern[Options[uPath]]]:=With[{thisVi=If[OptionValue["Scaffolding"],Ceiling[(i+j)/2],i+j],upath=uPath[n,i,i,j,j,"Scaffolding"->OptionValue["Scaffolding"],"Ordering"->If[TrueQ[And[j]],"Clockwise","CounterClockwise"]],break=If[OptionValue["Scaffolding"],-3,-2]},Join[upath[[;;break-1]],{upath[[break]]/.{"Left"->"Right","Right"->"Left",Subscript["p",a_]:>Subscript["V",Mod[a+Sign[j/i],n,1]],Subscript["p",a_,b_]:>Subscript["V",Mod[b/2+Sign[j/i],n,1]]},{Subscript[y,Mod[thisVi+UnitStep[j/i],n,1]],{},"Fixed"}}]]
 
 
-uYiPolynomial[n_Integer,i_Integer,tilde_Integer]:=Once[#[[1,2]]#[[2,1]]/(#[[1,1]]#[[2,2]])&@If[tilde>0,Dot@@Table[{#[[k-1]],#[[k]]}/.{{Subscript["V",a_],Subscript["p",_]}:>{{Subscript[y,a],0},{1,1}},
-{Subscript["V",a_],Subscript["V",b_]}:>{{Subscript[y,a],0},{1,1}},{Subscript["p",a_],Subscript["V",_]}:>{{1,1},{0,1}}},{k,2,Length[#]}]&@Delete[uPath[n,i,i],2],
-Dot@@Table[{#[[k-1]],#[[k]]}/.{{Subscript["V",a_],Subscript["p",_]}:>{{Subscript[y,a],Subscript[y,a]},{0,1}},{Subscript["V",a_],Subscript["V",b_]}:>{{Subscript[y,a],Subscript[y,a]},{0,1}},
-{Subscript["p",a_],Subscript["V",_]}:>{{1,0},{1,1}}},{k,2,Length[#]}]&@Reverse[Delete[uPath[n,i,i],2]]]]
+Options[uPolynomial]={"Scaffolding"->False};
+uPolynomial[n_Integer,ij__Integer|k_SuperPlus|k_SuperMinus,opts:OptionsPattern[Options[uPolynomial]]]:=Once[#[[1,2]]#[[2,1]]/(#[[1,1]]#[[2,2]])&@(Dot@@(uPath[n,ij,k,opts]/.{{y_,_,"Left"}:>{{y,y},{0,1}},{y_,_,"Right"}:>{{y,0},{1,1}},{__,"Fixed"}->Nothing}/.{Subscript[y,a_,b_]/;Mod[b-a-1,If[OptionValue["Scaffolding"],2n,n]]==0->1}))]
+uPolynomial[n_Integer,Subscript[i_,\[Infinity]]|Subscript[j_,-\[Infinity]],opts:OptionsPattern[Options[uPolynomial]]]:=Once[With[{uMatrices={Dot@@#1[[;;#2-1]],Dot@@#1[[#2;;]]}&@@{uPath[n,If[TrueQ[And[j]],SuperPlus[i],SuperMinus[j]],opts][[;;-2]]/.{{y_,_,"Left"}:>{{y,y},{0,1}},{y_,_,"Right"}:>{{y,0},{1,1}}}/.{Subscript[y,a_,b_]/;Mod[b-a-1,If[OptionValue["Scaffolding"],2n,n]]==0->1},If[OptionValue["Scaffolding"],3,2]}},
+With[{diag2=Diagonal[uMatrices[[2]]],nondiag2=uMatrices[[2]]-DiagonalMatrix[Diagonal[uMatrices[[2]]]]},Module[{m},Simplify[Together[#[[1,2]]#[[2,1]]/(#[[1,1]]#[[2,2]])&@(uMatrices[[1]] . (DiagonalMatrix[diag2^m]+(diag2[[2]]^m-diag2[[1]]^m)nondiag2/(diag2[[2]]-diag2[[1]])))]//.{Times[a_^m,b__]+c_/;FreeQ[c,m]:>c,a_^m+c_/;FreeQ[c,m]:>c}]]]]]
 
 
-StringyIntegrand$XY[n_]:=Once[PowerExpand[Product[If[Mod[i,n]+1==j,1,uijPolynomial[n,i,j]^Subscript[X,i,j]],{i,n},{j,n}]Product[uYiPolynomial[n,i,tag]^Subscript[If[tag>0,Y,\!\(\*
-TagBox[
-StyleBox[
-RowBox[{"OverTilde", "[", "Y", "]"}],
-ShowSpecialCharacters->False,
-ShowStringCharacters->True,
-NumberMarks->True],
-FullForm]\)],i],{i,n},{tag,{1,-1}}]/.a_Plus:>Factor[a]]]
+Options[StringyIntegrand$XY]={"Scaffolding"->False,"Surfacehedron"->"Dn\[Infinity]"};
+StringyIntegrand$XY[n_Integer,opts:OptionsPattern[Options[StringyIntegrand$XY]]]:=Once[With[{m=If[OptionValue["Scaffolding"],2n,n]},PowerExpand[Product[If[#===0,1,#]&@uPolynomial[n,i,j,PassOptions[opts,uPolynomial]]^Subscript[X,i,j],{i,m},{j,m}]*
+If[StringContainsQ[OptionValue["Surfacehedron"],"inf"|"\[Infinity]",IgnoreCase->True],Product[uPolynomial[n,Subscript[i,-\[Infinity]],PassOptions[opts,uPolynomial]]^Subscript[OverTilde[Y],i],{i,m}],Product[uPolynomial[n,SuperPlus[i],PassOptions[opts,uPolynomial]]^Subscript[Y,i],{i,m}]Product[uPolynomial[n,SuperMinus[i],PassOptions[opts,uPolynomial]]^Subscript[OverTilde[Y],i],{i,m}]]/.a_Plus:>Factor[a]]]]
 
 
 (*StringyIBP$5pt[expr_]:=Module[{AscendRules={
