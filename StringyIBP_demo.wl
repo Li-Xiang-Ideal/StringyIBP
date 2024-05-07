@@ -57,6 +57,11 @@ Xtoc[5,"Triangulation"->{Subscript[X,2,5],Subscript[X,3,5]}(* triangulation *)]
 Xtoc[5,"X"->x,"c"->cc,"Triangulation"->{Subscript[X,2,5],Subscript[X,3,5]}]
 
 
+stoXRules[5]
+stoXcRules[5]
+stoXcRules[5,"Triangulation"->{Subscript[X,2,5],Subscript[X,3,5]}(* triangulation *)]
+
+
 int[Subscript[X,1,3],Subscript[X,1,4],Subscript[c,1,3],Subscript[c,1,4],1+Subscript[c,2,4]]+int[Subscript[X,1,3],Subscript[X,1,4],Subscript[c,1,3],1+Subscript[c,1,4],Subscript[c,2,4]]//int$XctoX
 %//int$XtoXc
 
@@ -82,10 +87,21 @@ utoyRules[5]
 utoyRules[5,"Triangulation"->{Subscript[X,2,5],Subscript[X,3,5]}]
 
 
+ztoyRules[5]
+ztoyRules[5,"Triangulation"->{Subscript[X,2,5],Subscript[X,3,5]}]
+ztoyRules[5,"Fix SL2"->"1,2,n"]
+ztoyRules[5,"Fix SL2"->{Subscript[z,1]->\[Infinity],Subscript[z,4]->1,Subscript[z,5]->0}]
+
+
 StringyIntegrand$X[5]
 StringyIntegrand$Xc[5]
 StringyIntegrand$Xc[5,"Triangulation"->{Subscript[X,2,5],Subscript[X,3,5]}]
 StringyIntegrand$Xc[6,"Triangulation"->{Subscript[X,1,3],Subscript[X,3,5],Subscript[X,1,5]}]
+
+
+intPT$Xc[1,3,2,4,5]
+intPT$Xc[1,3,2,4,5,"Triangulation"->{Subscript[X,2,5],Subscript[X,3,5]}]
+intPT$X[1,3,2,4,5]
 
 
 StringyPolynomial[5,1,3,"Triangulation"->{}(* default triangulation Subscript[X,1,i] *)](* Subscript[p,1,3] *)
@@ -167,17 +183,20 @@ StringyIntegrand$XY[2,"Scaffolding"->True](* 1-loop 2-points integrand, scaffold
 (*5pt*)
 
 
-StringyReduction$X[5];
+StringyReduction$X[5];(* default reduce to PT-form *)
 %//MatrixForm
 
 
 StringyAscendRules$X[5]
 
 
-StringyDescendRules$X[5]
+StringyDescendRules$X[5](* default reduce to int with minimal shift *)
 
 
 Collect[int[-1+Subscript[X,1,3],Subscript[X,1,4],1+Subscript[X,2,4],1+Subscript[X,2,5],Subscript[X,3,5]]//.StringyAscendRules$X[5]//.StringyDescendRules$X[5],intXs$List[5]]//Simplify(* reduce to master integral *)
+
+
+Collect[int[-1+Subscript[X,1,3],Subscript[X,1,4],1+Subscript[X,2,4],1+Subscript[X,2,5],Subscript[X,3,5]]//.StringyAscendRules$X[5]//.StringyDescendRules$X[5]/.{StringyRelations$X[5][[-1]]/.Equal->Rule},intXs$List[5]]//Simplify(* reduce to master integral *)
 
 
 (* ::Subsubsection:: *)
@@ -185,7 +204,7 @@ Collect[int[-1+Subscript[X,1,3],Subscript[X,1,4],1+Subscript[X,2,4],1+Subscript[
 
 
 StringyRandomReduction$X[6];(* first time to run this may takes a long time, following use would be much faster *)
-Pause[3];(* error may occur without this pause *)%[[-1]]
+Pause[3];(* error may occur without this pause *)%[[-2]]
 Length[DeleteCases[%,0]]-1(* 6 master integral *)
 
 

@@ -3,7 +3,7 @@
 (************************ 0. Info and copyright ***********************)
 
 
-StringyIBP$Version={"0.0.5","2024.4.25"};
+StringyIBP$Version={"0.0.6","2024.5.7"};
 
 
 (* Introduction to StringyIBP *)
@@ -21,6 +21,8 @@ StringyIBP$Version={"0.0.5","2024.4.25"};
                      2.Use Options to specify certain parameters.
    0.0.5  2024.4.25  1.Add scaffolding.
                      2.Use Dn\[Infinity] instead of Dn.
+   0.0.6  2024.5.7   1.Add Parke-Taylor form.
+                     2.Rewrite Options passing.
 *)
 
 
@@ -51,7 +53,7 @@ Protect[$GlobalConventions$DeletedCij$];
 Init[input_,default_]:=Switch[input,Null|Missing|{},default,_,input]
 
 
-PassOptions[opts___,function_]:=Sequence@@Select[{opts},MemberQ[Options[function][[All,1]],#[[1]]]&]
+PassOptions[opts___Rule,func1_,func2_]:=Sequence@@FilterRules[Normal[Merge[{opts,Options[func1]},First]],Options[func2]]
 
 
 LevelSpecQ[levelspec_]:=MatchQ[levelspec,All|Infinity|_Integer|{(_Integer|All|Infinity)...}]
@@ -70,13 +72,13 @@ ExtractVarSubscript[expr_,vars_List,sort_:(#&)]:=SortBy[Cases[{expr},Alternative
 
 
 Options[ParallelExpand]={"PieceLength"->500,Method->"CoarsestGrained"};
-ParallelExpand[expr_Plus,OptionsPattern[Options[ParallelExpand]]]:=With[{piecelength=OptionValue["PieceLength"]},Module[{progress=0},SetSharedVariable[progress];
+ParallelExpand[expr_Plus,OptionsPattern[]]:=With[{piecelength=OptionValue["PieceLength"]},Module[{progress=0},SetSharedVariable[progress];
 Monitor[Plus@@ParallelTable[(progress++;Expand[expr[[piecelength i+1;;Min[piecelength(i+1),expr//Length]]]]),{i,0,Ceiling[Length[expr]/piecelength]-1},Method->OptionValue[Method]],
 ToString[progress]<>"/"<>ToString[Ceiling[Length[expr]/piecelength]]<>" terms have been expanded."]]]
 
 
 Options[ParallelReplace]={"PieceLength"->500,Method->"CoarsestGrained"};
-ParallelReplace[expr:_List|_Integer,rules_,Optional[levelspec_?LevelSpecQ,All],OptionsPattern[Options[ParallelReplace]]]:=With[{piecelength=OptionValue["PieceLength"]},Module[{progress=0,output},SetSharedVariable[progress];
+ParallelReplace[expr:_List|_Integer,rules_,Optional[levelspec_?LevelSpecQ,All],OptionsPattern[]]:=With[{piecelength=OptionValue["PieceLength"]},Module[{progress=0,output},SetSharedVariable[progress];
 output=Monitor[ParallelTable[(progress++;Replace[expr[[piecelength i+1;;Min[piecelength(i+1),expr//Length]]],Dispatch[rules],levelspec]),{i,0,Ceiling[Length[expr]/piecelength]-1},Method->OptionValue[Method]],
 ToString[progress]<>"/"<>ToString[Ceiling[Length[expr]/piecelength]]<>" terms have been replaced."];
 If[Head[expr]===Plus,Plus@@output,output]]]
@@ -89,28 +91,33 @@ SetGlobalConventions["deleted cij"->n_Integer]:=(Unprotect[$GlobalConventions$De
 
 
 Options[Xtri$Default]={"X"->X};
-Xtri$Default[n_,OptionsPattern[Options[Xtri$Default]]]:=With[{X=OptionValue["X"],adj=Mod[{-1,0,1}-$GlobalConventions$DeletedCij$,n,1]},Table[Subscript[X,j,adj[[2]]],{j,Complement[Range[n],adj]}]/.Subscript[X,i_,j_]/;i>j:>Subscript[X,j,i]//Sort]
+Xtri$Default[n_,OptionsPattern[]]:=With[{X=OptionValue["X"],adj=Mod[{-1,0,1}-$GlobalConventions$DeletedCij$,n,1]},Table[Subscript[X,j,adj[[2]]],{j,Complement[Range[n],adj]}]/.Subscript[X,i_,j_]/;i>j:>Subscript[X,j,i]//Sort]
 
 
 Options[Xvars]={"X"->X};
 Options[Xcvars]={"X"->X,"c"->c,"Triangulation"->{}};
-Xvars[n_,OptionsPattern[Options[Xvars]]]:=With[{X=OptionValue["X"]},DeleteCases[Table[Subscript[X,a,b],{a,1,n},{b,a+2,n}]//Flatten,Subscript[X,1,n]]]
-Xcvars[n_,opts:OptionsPattern[Options[Xcvars]]]:=With[{X=OptionValue["X"],c=OptionValue["c"],Xi=Init[OptionValue["Triangulation"],Xtri$Default[n,PassOptions[opts,Xtri$Default]]],del$c=$GlobalConventions$DeletedCij$},Join[Xi,Sort[Complement[Xvars[n,"X"->c],Xi/.Subscript[X,i_,j_]:>Subscript[c,Mod[i+del$c,n,1],Mod[j+del$c,n,1]]/.Subscript[c,i_,j_]/;i>j:>Subscript[c,j,i]]]]]
+Xvars[n_,OptionsPattern[]]:=With[{X=OptionValue["X"]},DeleteCases[Table[Subscript[X,a,b],{a,1,n},{b,a+2,n}]//Flatten,Subscript[X,1,n]]]
+Xcvars[n_,opts:OptionsPattern[]]:=With[{X=OptionValue["X"],c=OptionValue["c"],Xi=Init[OptionValue["Triangulation"],Xtri$Default[n,Sequence@@FilterRules[{opts},Options[Xtri$Default]]]],del$c=$GlobalConventions$DeletedCij$},Join[Xi,Sort[Complement[Xvars[n,"X"->c],Xi/.Subscript[X,i_,j_]:>Subscript[c,Mod[i+del$c,n,1],Mod[j+del$c,n,1]]/.Subscript[c,i_,j_]/;i>j:>Subscript[c,j,i]]]]]
 
 
 Options[Xcal]={"X"->X};
 Options[ctoX]={"X"->X,"c"->c};
 Options[Xtoc]={"X"->X,"c"->c,"Triangulation"->{}};
-Xcal[n_,OptionsPattern[Options[Xcal]]]:=With[{X=OptionValue["X"]},{Subscript[X,i_,j_]:>Subscript[X,j,i]/;i>j,Subscript[X,i_,j_]/;i>n||j>n:>Subscript[X,Mod[i,n,1],Mod[j,n,1]],Subscript[X,i_,j_]/;j==i+1->0,Subscript[X,1,n]->0}]
-ctoX[n_,opts:OptionsPattern[Options[ctoX]]]:=With[{X=OptionValue["X"],c=OptionValue["c"]},{Subscript[c,i_,j_]:>(Subscript[X,i,j]+Subscript[X,i+1,j+1]-Subscript[X,i,j+1]-Subscript[X,i+1,j]//.Xcal[n,PassOptions[opts,Xcal]])}]
-Xtoc[n_,opts:OptionsPattern[Options[Xtoc]]]:=Once[With[{X=OptionValue["X"]},Solve[(#==(#/.ctoX[n,PassOptions[opts,ctoX]]))&/@Xcvars[n,opts],Complement[Xvars[n,"X"->X],Xcvars[n,opts]]][[1]]]]
+Xcal[n_,OptionsPattern[]]:=With[{X=OptionValue["X"]},{Subscript[X,i_,j_]:>Subscript[X,j,i]/;i>j,Subscript[X,i_,j_]/;i>n||j>n:>Subscript[X,Mod[i,n,1],Mod[j,n,1]],Subscript[X,i_,j_]/;j==i+1->0,Subscript[X,1,n]->0}]
+ctoX[n_,opts:OptionsPattern[]]:=With[{X=OptionValue["X"],c=OptionValue["c"]},{Subscript[c,i_,j_]:>(Subscript[X,i,j]+Subscript[X,i+1,j+1]-Subscript[X,i,j+1]-Subscript[X,i+1,j]//.Xcal[n,Sequence@@FilterRules[{opts},Options[Xcal]]])}]
+Xtoc[n_,opts:OptionsPattern[]]:=Once[With[{X=OptionValue["X"]},Solve[(#==(#/.ctoX[n,Sequence@@FilterRules[{opts},Options[ctoX]]]))&/@Xcvars[n,opts],Complement[Xvars[n,"X"->X],Xcvars[n,opts]]][[1]]]]
+
+
+Options[stoXcRules]={"Triangulation"->{}};
+stoXRules[n_]:=Solve[Join[Table[Sum[Subscript[s,i,j],{j,n}]==0/.{Subscript[s,i_,j_]/;i>j:>Subscript[s,j,i],Subscript[s,i_,i_]->0},{i,n}],Xvars[n]/.{Subscript[X,i_,j_]:>Subscript[X,i,j]==Sum[Subscript[s,a,b],{a,i,j-1},{b,a,j-1}]}/.{Subscript[s,i_,j_]/;i>j:>Subscript[s,j,i],Subscript[s,i_,i_]->0}],Flatten@Table[Subscript[s,i,j],{i,n},{j,i+1,n}]][[1]]
+stoXcRules[n_,opts:OptionsPattern[]]:=Solve[Join[Table[Sum[Subscript[s,i,j],{j,n}]==0/.{Subscript[s,i_,j_]/;i>j:>Subscript[s,j,i],Subscript[s,i_,i_]->0},{i,n}],Xcvars[n,opts]/.{Subscript[X,i_,j_]:>Subscript[X,i,j]==Sum[Subscript[s,a,b],{a,i,j-1},{b,a,j-1}],Subscript[c,i_,j_]:>Subscript[c,i,j]==-Subscript[s,i,j]}/.{Subscript[s,i_,j_]/;i>j:>Subscript[s,j,i],Subscript[s,i_,i_]->0}],Flatten@Table[Subscript[s,i,j],{i,n},{j,i+1,n}]][[1]]
 
 
 Options[int$XctoX]={"Triangulation"->{}};
 Options[int$XtoXc]={"Triangulation"->{}};
-int$XctoX[expr_,OptionsPattern[Options[int$XctoX]]]:=(expr/.{integral_int:>Module[{n=(3+Sqrt[9+8 Length[integral]])/2},With[{Xtri="Triangulation"->Init[OptionValue["Triangulation"],Xtri$Default[n]]},
+int$XctoX[expr_,OptionsPattern[]]:=(expr/.{integral_int:>Module[{n=(3+Sqrt[9+8 Length[integral]])/2},With[{Xtri="Triangulation"->Init[OptionValue["Triangulation"],Xtri$Default[n]]},
 int@@Xvars[n]/.Xtoc[n,Xtri]/.Rule@@@({Xcvars[n,Xtri],List@@integral}\[Transpose])/.ctoX[n]]]})
-int$XtoXc[expr_,OptionsPattern[Options[int$XtoXc]]]:=(expr/.{integral_int:>Module[{n=(3+Sqrt[9+8 Length[integral]])/2},With[{Xtri="Triangulation"->Init[OptionValue["Triangulation"],Xtri$Default[n]]},
+int$XtoXc[expr_,OptionsPattern[]]:=(expr/.{integral_int:>Module[{n=(3+Sqrt[9+8 Length[integral]])/2},With[{Xtri="Triangulation"->Init[OptionValue["Triangulation"],Xtri$Default[n]]},
 int@@Xcvars[n,Xtri]/.ctoX[n]/.Rule@@@({Xvars[n],List@@integral}\[Transpose])/.Xtoc[n,Xtri]]]})
 
 
@@ -125,19 +132,19 @@ Xc$cyclicPerm[expr_,n_,k_]:=Nest[(#/.{Subscript[X,a_,b_]:>Subscript[X,Mod[a+1,n,
 
 
 Options[intXshift$cutoff]={"cutoff"->{1,True}};
-intXshift$cutoff[inteq_,OptionsPattern[Options[intXshift$cutoff]]]:=With[{k=OptionValue["cutoff"][[1]],tag=OptionValue["cutoff"][[2]]},
+intXshift$cutoff[inteq_,OptionsPattern[]]:=With[{k=OptionValue["cutoff"][[1]],tag=OptionValue["cutoff"][[2]]},
 If[TrueQ@tag,Max[Count[#,k+1+Subscript[X,__],\[Infinity]]&/@Cases[inteq,_int,\[Infinity]]]<=1&&FreeQ[inteq,int[___,Subscript[X,__]+m_Integer/;m<0||m>k+1,___]],FreeQ[inteq,int[___,Subscript[X,__]+m_Integer/;m<0||m>k,___]]]]
 intXshift$sort[inteq_]:=With[{shifts=Abs[List@@@DeleteCases[Cases[{inteq},_int,\[Infinity]],Subscript[X,__],\[Infinity]]]},{Max@@Plus@@@shifts,Max@@Max@@@shifts,Plus@@Flatten[shifts],Plus@@Flatten[shifts]}]
 
 
 Options[SelectStringyEquations$noshift]={"Triangulation"->{}};
-SelectStringyEquations$noshift[eqs_,opts:OptionsPattern[Options[SelectStringyEquations$noshift]]]:=With[{n=(3+Sqrt[9+8 Length[ExtractVariableList[eqs,int][[1]]]])/2},
+SelectStringyEquations$noshift[eqs_,opts:OptionsPattern[]]:=With[{n=(3+Sqrt[9+8 Length[ExtractVariableList[eqs,int][[1]]]])/2},
 Select[eqs,Intersection[Table[#[[1]]/.Xij->Xij-1,{Xij,If[MemberQ[eqs,int[___,Subscript[c,__],___],\[Infinity]],Xcvars[n,opts],Xvars[n]]}],eqs[[;;,1]]]==={}&]]
 SelectStringyEquations$AscendX[eqs_List,Xij_]:=With[{n=(3+Sqrt[9+8 Length[ExtractVariableList[eqs,int][[1]]]])/2},SortBy[Select[eqs,FreeQ[#[[2]],int[___,Xij,___]]&],intXshift$sort[#[[2]]]&]]
 
 
 Options[utoyRules]={"Triangulation"->{}};
-utoyRules[n_,OptionsPattern[Options[utoyRules]]]:=Once[With[{Xi=Init[OptionValue["Triangulation"],Xtri$Default[n]],del$c=$GlobalConventions$DeletedCij$},
+utoyRules[n_,OptionsPattern[]]:=Once[With[{Xi=Init[OptionValue["Triangulation"],Xtri$Default[n]],del$c=$GlobalConventions$DeletedCij$},
 Module[{xvar=Complement[Xvars[n],Xi],cvar=Complement[Xvars[n,"X"->c],Xi/.Subscript[X,i_,j_]:>Subscript[c,Mod[i+del$c,n,1],Mod[j+del$c,n,1]]/.Subscript[c,i_,j_]/;i>j:>Subscript[c,j,i]],sol,ytou,ueqs},
 sol=Solve[(cvar/.Subscript[c,i_,j_]:>Subscript[X,i,j]+Subscript[X,i+1,j+1]-Subscript[X,i,j+1]-Subscript[X,i+1,j]//.Xcal[n])==0,xvar][[1]]/.X->u;
 ytou=Table[Subscript[y,i]==#[[i]]Product[sol[[j,1]]^Coefficient[sol[[j,2]],#[[i]]],{j,1,Length@sol}],{i,1,Length@#}]&@(Xi/.X->u);
@@ -147,19 +154,33 @@ Solve[ytou~Join~ueqs,Xvars[n,"X"->u]][[1]]]]]
 
 
 Options[ytozRules]={"Triangulation"->{}};
-ytozRules[n_,OptionsPattern[Options[ytozRules]]]:=Once[With[{Xi=Init[OptionValue["Triangulation"],Xtri$Default[n]],del$c=$GlobalConventions$DeletedCij$},Module[{xvar=Complement[Xvars[n],Xi],
+ytozRules[n_,OptionsPattern[]]:=Once[With[{Xi=Init[OptionValue["Triangulation"],Xtri$Default[n]],del$c=$GlobalConventions$DeletedCij$},Module[{xvar=Complement[Xvars[n],Xi],
 cvar=Complement[Xvars[n,"X"->c],Xi/.Subscript[X,i_,j_]:>Subscript[c,Mod[i+del$c,n,1],Mod[j+del$c,n,1]]/.Subscript[c,i_,j_]/;i>j:>Subscript[c,j,i]],sol,ytou,ueqs},
 sol=Solve[(cvar/.Subscript[c,i_,j_]:>Subscript[X,i,j]+Subscript[X,i+1,j+1]-Subscript[X,i,j+1]-Subscript[X,i+1,j]//.Xcal[n])==0,xvar][[1]]/.X->u;
 ytou=Table[Subscript[y,i]->#[[i]]Product[sol[[j,1]]^Coefficient[sol[[j,2]],#[[i]]],{j,1,Length@sol}],{i,1,Length@#}]&@(Xi/.X->u);
 ytou/.Subscript[u,i_,j_]:>(Subscript[z,i-1]-Subscript[z,j])(Subscript[z,i]-Subscript[z,j-1])/((Subscript[z,i]-Subscript[z,j])(Subscript[z,i-1]-Subscript[z,j-1]))/.Subscript[z,i_]:>Subscript[z,Mod[i,n,1]]//Cancel]]]
 
 
+Options[ztoyRules]={"Triangulation"->{},"Fix SL2"->"1,n-1,n"};
+ztoyRules[n_,opts:OptionsPattern[]]:=With[{fixSL2=SortBy[Switch[OptionValue["Fix SL2"],"1,n-1,n",{Subscript[z,1]->0,Subscript[z,n-1]->1,Subscript[z,n]->\[Infinity]},"1,2,n",{Subscript[z,1]->0,Subscript[z,2]->1,Subscript[z,n]->\[Infinity]},_,OptionValue["Fix SL2"]],Count[#,\[Infinity],\[Infinity]]&]},
+SortBy[Join[fixSL2,Solve[Map[Limit[#,fixSL2[[-1]]]&,ytozRules[n,Sequence@@FilterRules[{opts},Options[ytozRules]]]/.Rule->Equal/.fixSL2[[;;-2]],{2}],Complement[Table[Subscript[z,$i],{$i,n}],fixSL2[[;;,1]]]][[1]]//Factor],Count[#,\[Infinity],\[Infinity]]&]]
+
+
 Options[StringyIntegrand$X]={"Triangulation"->{}};
 Options[StringyIntegrand$Xc]={"Triangulation"->{}};
 Options[StringyPolynomial]={"Triangulation"->{}};
-StringyIntegrand$X[n_,opts:OptionsPattern[Options[StringyIntegrand$X]]]:=PowerExpand[Product[Subscript[u,i,j]^Subscript[X,i,j],{i,n-2},{j,i+2,If[i==1,n-1,n]}]/Product[Subscript[y,i],{i,n-3}]/.utoyRules[n,opts]]
-StringyIntegrand$Xc[n_,opts:OptionsPattern[Options[StringyIntegrand$Xc]]]:=PowerExpand[Product[Subscript[u,i,j]^Subscript[X,i,j],{i,n-2},{j,i+2,If[i==1,n-1,n]}]/Product[Subscript[y,i],{i,n-3}]/.utoyRules[n,opts]/.Xtoc[n,opts]]
-StringyPolynomial[n_,i_,j_,opts:OptionsPattern[Options[StringyIntegrand$Xc]]]:=Once[Times@@Cases[StringyIntegrand$Xc[n,opts],_^-Subscript[c,i,j]][[;;,1]]]
+StringyIntegrand$X[n_,opts:OptionsPattern[]]:=PowerExpand[Product[Subscript[u,i,j]^Subscript[X,i,j],{i,n-2},{j,i+2,If[i==1,n-1,n]}]/Product[Subscript[y,i],{i,n-3}]/.utoyRules[n,opts]]
+StringyIntegrand$Xc[n_,opts:OptionsPattern[]]:=PowerExpand[Product[Subscript[u,i,j]^Subscript[X,i,j],{i,n-2},{j,i+2,If[i==1,n-1,n]}]/Product[Subscript[y,i],{i,n-3}]/.utoyRules[n,opts]/.Xtoc[n,opts]]
+StringyPolynomial[n_,i_,j_,opts:OptionsPattern[]]:=Once[Times@@Cases[StringyIntegrand$Xc[n,opts],_^-Subscript[c,i,j]][[;;,1]]]
+
+
+Options[intPT$Xc]={"Triangulation"->{},"Fix SL2"->"1,n-1,n"};
+Options[intPT$X]={"Triangulation"->{},"Fix SL2"->"1,n-1,n"};
+intPT$Xc[perm__Integer,opts:OptionsPattern[]]:=With[{PT=(Times@@({i,j}|->1/(Subscript[z,i]-Subscript[z,j]))@@@({{##},RotateLeft@{##}}\[Transpose])&),ztoy=ztoyRules[Length[{perm}],opts],n=Length[{perm}]},
+With[{prefactor=Limit[PT[perm]/PT@@Range[n]/.ztoy[[;;-2]],ztoy[[-1]]]//Factor,shiftRules=SortBy[Rule@@@(List@@StringyIntegrand$Xc[n,Sequence@@FilterRules[{opts},Options[StringyIntegrand$Xc]]]/.Power->List/.{y_,Xc_Subscript+n_Integer}:>{y,Xc}/.{y_,-Xc_Subscript}:>{y,Xc^-1}),-LeafCount[#[[1]]]&],intXc=int@@Xcvars[n,Sequence@@FilterRules[{opts},Options[Xcvars]]]},
+If[NumericQ[prefactor],prefactor intXc,If[Head[prefactor]===Times,Select[prefactor,FreeQ[#,Subscript[y,_]]&]intXc/.(Select[List@@prefactor,!FreeQ[#,Subscript[y,_]]&]/.shiftRules/.{Xc_Subscript:>(Xc->Xc+1),Xc_Subscript^n_:>(Xc->Xc+n)}),Print["Error."]]]]]
+intPT$X[perm__Integer,opts:OptionsPattern[]]:=int$XctoX[intPT$Xc[perm,opts],Sequence@@FilterRules[{opts},Options[int$XctoX]]]
+intX$PTshift$sort[inteq_]:=With[{n=(3+Sqrt[9+8 Length[Cases[{inteq},_int,\[Infinity]][[1]]]])/2},With[{intPTs=Once[Alternatives@@Union@Cases[intPT$X[1,Sequence@@#,n-1,n]&/@Permutations[Range[2,n-2]],_int,\[Infinity]]]},{Count[{inteq},Except[intPTs,_int],\[Infinity]],intXshift$sort[inteq]}]]
 
 
 (************************ 4. Functions Part III ***********************)
@@ -167,22 +188,22 @@ StringyPolynomial[n_,i_,j_,opts:OptionsPattern[Options[StringyIntegrand$Xc]]]:=O
 
 Options[TrivialIdentity$Xc]={"Triangulation"->{},"F Polynomial"->StringyPolynomial};
 Options[TrivialIdentity$X]={"Triangulation"->{},"F Polynomial"->StringyPolynomial};
-TrivialIdentity$Xc[n_,i_,j_,OptionsPattern[Options[TrivialIdentity$Xc]]]:=With[{Xi=Init[OptionValue["Triangulation"],Xtri$Default[n]],p=OptionValue["F Polynomial"]},
+TrivialIdentity$Xc[n_,i_,j_,OptionsPattern[]]:=With[{Xi=Init[OptionValue["Triangulation"],Xtri$Default[n]],p=OptionValue["F Polynomial"]},
 With[{getRules=(expr|->Array[Xi[[#]]->Xi[[#]]+Exponent[expr,Subscript[y,#]]&,n-3]),intXc=int@@Xcvars[n,"Triangulation"->Xi],toList=(Switch[#,_Plus,List@@#,0,{},_,{#}]&),Xtri="Triangulation"->Xi},
 If[p[n,i,j,Xtri]=!=1,intXc-Plus@@((intXc/.getRules[#]&)/@(toList@Expand@p[n,i,j,Xtri])/.Subscript[c,i,j]->Subscript[c,i,j]+1),0]]]
-TrivialIdentity$X[n_,i_,j_,opts:OptionsPattern[Options[TrivialIdentity$X]]]:=int$XctoX[TrivialIdentity$Xc[n,i,j,opts],PassOptions[opts,int$XctoX]]
+TrivialIdentity$X[n_,i_,j_,opts:OptionsPattern[]]:=int$XctoX[TrivialIdentity$Xc[n,i,j,opts],Sequence@@FilterRules[{opts},Options[int$XctoX]]]
 
 
 Options[IBP$Identity$Xc]={"Triangulation"->{},"F Polynomial"->StringyPolynomial};
 Options[IBP$Identity$X]={"Triangulation"->{},"F Polynomial"->StringyPolynomial};
-IBP$Identity$Xc[n_,k_,opts:OptionsPattern[Options[IBP$Identity$Xc]]]:=With[{Xi=Init[OptionValue["Triangulation"],Xtri$Default[n]],p=OptionValue["F Polynomial"]},
+IBP$Identity$Xc[n_,k_,opts:OptionsPattern[]]:=With[{Xi=Init[OptionValue["Triangulation"],Xtri$Default[n]],p=OptionValue["F Polynomial"]},
 With[{getRules=(expr|->Array[Xi[[#]]->Xi[[#]]+Exponent[expr,Subscript[y,#]]&,n-3]),intXc=int@@Xcvars[n,"Triangulation"->Xi],toList=(Switch[#,_Plus,List@@#,0,{},_,{#}]&),Xtri="Triangulation"->Xi},
 If[1<=k<=n-3,Xi[[k]]intXc-Sum[Subscript[c,i,j]Plus@@((intXc/.getRules[#]&)/@(toList@Expand@D[p[n,i,j,Xtri],Subscript[y,k]])/.{Xi[[k]]->Xi[[k]]+1,Subscript[c,i,j]->Subscript[c,i,j]+1}),{i,1,n},{j,i,n}],Print["1\[LessEqual]k\[LessEqual]n-3?"]]//Expand]]
-IBP$Identity$X[n_,k_,opts:OptionsPattern[Options[IBP$Identity$X]]]:=int$XctoX[IBP$Identity$Xc[n,k,opts],PassOptions[opts,int$XctoX]]/.ctoX[n]
+IBP$Identity$X[n_,k_,opts:OptionsPattern[]]:=int$XctoX[IBP$Identity$Xc[n,k,opts],Sequence@@FilterRules[{opts},Options[int$XctoX]]]/.ctoX[n]
 
 
 Options[CheckStringyIdentity]={"Triangulation"->{}};
-CheckStringyIdentity[id_,opts:OptionsPattern[Options[CheckStringyIdentity]]]:=With[{n=(3+Sqrt[9+8 Length[Cases[id,_int,\[Infinity]][[1]]]])/2,IBPtag=Cases[id//Simplify,_int*Subscript[X,__],\[Infinity]]},With[{Xi=Init[OptionValue["Triangulation"],Xtri$Default[n]],
+CheckStringyIdentity[id_,opts:OptionsPattern[]]:=With[{n=(3+Sqrt[9+8 Length[Cases[id,_int,\[Infinity]][[1]]]])/2,IBPtag=Cases[id//Simplify,_int*Subscript[X,__],\[Infinity]]},With[{Xi=Init[OptionValue["Triangulation"],Xtri$Default[n]],
 intXRule=RuleDelayed@@{int@@Xvars[n]/.XctoPattern,StringyIntegrand$X[n,opts]/.XctoVarName}},With[{intXcRule=RuleDelayed@@{int@@Xcvars[n,opts]/.XctoPattern,StringyIntegrand$Xc[n,opts]/.XctoVarName},yi=Subscript[y,Position[Xi,#][[1,1]]]&},
 If[MemberQ[id,int[___,Subscript[c,__]],\[Infinity]],(id/.intXcRule)-If[IBPtag=!={},D[yi@IBPtag[[1,-1]]StringyIntegrand$Xc[n,opts],yi@IBPtag[[1,-1]]],0],
 (id/.intXRule)-If[IBPtag=!={},D[yi@IBPtag[[1,-1]]StringyIntegrand$X[n,opts],yi@IBPtag[[1,-1]]],0]]==0//Simplify]]]
@@ -192,40 +213,40 @@ Options[StringyIdentity$X]={"Triangulation"->{}};
 Options[StringyIdentity$Xc]={"Triangulation"->{}};
 Options[StringyIdentity$X$shift]={"Triangulation"->{},"cutoff"->{1,True},"F Polynomial"->StringyPolynomial};
 Options[StringyIdentity$X$All]={"Triangulation"->{},"cutoff"->{1,True},"F Polynomial"->StringyPolynomial};
-StringyIdentity$X[n_,opts:OptionsPattern[Options[StringyIdentity$X]]]:=Once[DeleteCases[Flatten[Table[Expand@TrivialIdentity$X[n,i,j,opts]==0,{i,1,n},{j,i,n}]]~Join~Flatten[Table[Expand@IBP$Identity$X[n,k,opts]==0,{k,n-3}]],True]]
-StringyIdentity$Xc[n_,opts:OptionsPattern[Options[StringyIdentity$Xc]]]:=Once[DeleteCases[Flatten[Table[Expand@TrivialIdentity$Xc[n,i,j,opts]==0,{i,1,n},{j,i,n}]]~Join~Flatten[Table[Expand@IBP$Identity$Xc[n,k,opts]==0,{k,n-3}]],True]]
-StringyIdentity$X$shift[n_,opts:OptionsPattern[Options[StringyIdentity$X$shift]]]:=Once[With[{k=OptionValue["cutoff"][[1]]},(#[[1]]-#[[2]])&/@FullSimplify[DeleteDuplicates[Select[Flatten@
-Table[eq/.Apply[Rule,{Xvars[n],Xvars[n]+#}\[Transpose]&/@Tuples[Range[0,k],n (n-3)/2],{2}],{eq,StringyIdentity$X[n,PassOptions[opts,StringyIdentity$X]]}],intXshift$cutoff[#,PassOptions[opts,intXshift$cutoff]]&]]]]]
-StringyIdentity$X$All[n_,opts:OptionsPattern[Options[StringyIdentity$X$All]]]:=Once[DeleteDuplicates[Table[Xc$cyclicPerm[Once[StringyIdentity$X$shift[n,opts]],n,m],{m,0,n-1}]//Flatten]]
+StringyIdentity$X[n_,opts:OptionsPattern[]]:=Once[DeleteCases[Flatten[Table[Expand@TrivialIdentity$X[n,i,j,opts]==0,{i,1,n},{j,i,n}]]~Join~Flatten[Table[Expand@IBP$Identity$X[n,k,opts]==0,{k,n-3}]],True]]
+StringyIdentity$Xc[n_,opts:OptionsPattern[]]:=Once[DeleteCases[Flatten[Table[Expand@TrivialIdentity$Xc[n,i,j,opts]==0,{i,1,n},{j,i,n}]]~Join~Flatten[Table[Expand@IBP$Identity$Xc[n,k,opts]==0,{k,n-3}]],True]]
+StringyIdentity$X$shift[n_,opts:OptionsPattern[]]:=Once[With[{k=OptionValue["cutoff"][[1]]},(#[[1]]-#[[2]])&/@FullSimplify[DeleteDuplicates[Select[Flatten@
+Table[eq/.Apply[Rule,{Xvars[n],Xvars[n]+#}\[Transpose]&/@Tuples[Range[0,k],n (n-3)/2],{2}],{eq,StringyIdentity$X[n,Sequence@@FilterRules[{opts},Options[StringyIdentity$X]]]}],intXshift$cutoff[#,Sequence@@FilterRules[{opts},Options[intXshift$cutoff]]]&]]]]]
+StringyIdentity$X$All[n_,opts:OptionsPattern[]]:=Once[DeleteDuplicates[Table[Xc$cyclicPerm[Once[StringyIdentity$X$shift[n,opts]],n,m],{m,0,n-1}]//Flatten]]
 
 
-Options[intXs$List]={"cutoff"->{1,True},"Sort Funtion"->intXshift$sort};
-intXs$List[n_,opts:OptionsPattern[Options[intXs$List]]]:=Once[With[{k=OptionValue["cutoff"][[1]]},SortBy[Select[int@@@(Xvars[n]+#&/@Tuples[Range[0,k+1],n (n-3)/2]),intXshift$cutoff[#,PassOptions[opts,intXshift$cutoff]]&],OptionValue["Sort Funtion"]]]]
+Options[intXs$List]={"cutoff"->{1,True},"Sort Function"->intX$PTshift$sort};
+intXs$List[n_,opts:OptionsPattern[]]:=Once[With[{k=OptionValue["cutoff"][[1]]},SortBy[Select[int@@@(Xvars[n]+#&/@Tuples[Range[0,k+1],n (n-3)/2]),intXshift$cutoff[#,Sequence@@FilterRules[{opts},Options[intXshift$cutoff]]]&],OptionValue["Sort Function"]]]]
 
 
-Options[StringyReductionDataFF$X]={"Triangulation"->{},"cutoff"->{1,True},"F Polynomial"->StringyPolynomial,"Extra Equations"->{},"Sort Funtion"->intXshift$sort,"intFF"->intFF};
-StringyReductionDataFF$X[n_,opts:OptionsPattern[Options[StringyReductionDataFF$X]]]:=With[{intXs=intXs$List[n,PassOptions[opts,intXs$List]],XctoVarName$FF=Dispatch[#->(#/.XctoVarName)&/@Xvars[n]],intFF=OptionValue["intFF"]},
-With[{intXtoFF=Table[intXs[[$i]]->intFF[$i],{$i,Length[intXs]}]},{{Collect[#,_intFF]&/@(Join[#==0&/@StringyIdentity$X$All[n,PassOptions[opts,StringyIdentity$X$All]],List@@OptionValue["Extra Equations"]]/.Dispatch[intXtoFF]),Reverse[intXtoFF[[All,2]]],"Parameters"->Xvars[n],"VarsPattern"->(Union[Cases[{#},_intFF,Infinity]]&)},Reverse/@intXtoFF}/.XctoVarName$FF]]
+Options[StringyReductionDataFF$X]={"Triangulation"->{},"cutoff"->{1,True},"F Polynomial"->StringyPolynomial,"Extra Equations"->{},"Sort Function"->intX$PTshift$sort,"intFF"->intFF};
+StringyReductionDataFF$X[n_,opts:OptionsPattern[]]:=With[{intXs=intXs$List[n,Sequence@@FilterRules[{opts},Options[intXs$List]]],XctoVarName$FF=Dispatch[#->(#/.XctoVarName)&/@Xvars[n]],intFF=OptionValue["intFF"]},
+With[{intXtoFF=Table[intXs[[$i]]->intFF[$i],{$i,Length[intXs]}]},{{Collect[#,_intFF]&/@(Join[#==0&/@StringyIdentity$X$All[n,Sequence@@FilterRules[{opts},Options[StringyIdentity$X$All]]],List@@OptionValue["Extra Equations"]]/.Dispatch[intXtoFF]),Reverse[intXtoFF[[All,2]]],"Parameters"->Xvars[n],"VarsPattern"->(Union[Cases[{#},_intFF,Infinity]]&)},Reverse/@intXtoFF}/.XctoVarName$FF]]
 
 
-Options[StringyReduction$X]={"Triangulation"->{},"cutoff"->{1,True},"F Polynomial"->StringyPolynomial,"Sort Funtion"->intXshift$sort};
-Options[StringyRelations$X]={"Triangulation"->{},"cutoff"->{1,True},"F Polynomial"->StringyPolynomial,"Sort Funtion"->intXshift$sort};
-StringyReduction$X[n_,opts:OptionsPattern[Options[StringyReduction$X]]]:=Once[DeleteCases[RowReduce[Once[Reverse[Coefficient[#,intXs$List[n,PassOptions[opts,intXs$List]]]]&/@StringyIdentity$X$All[n,PassOptions[opts,StringyIdentity$X$All]]]]//Simplify,{0..}]]
-StringyRelations$X[n_,opts:OptionsPattern[Options[StringyRelations$X]]]:=Once[(coeff|->FirstCase[#,{1,_}][[2]]==-Plus@@Times@@@Cases[#,Except[{0,_}]][[2;;]]&@({coeff,Reverse[intXs$List[n,PassOptions[opts,intXs$List]]]}\[Transpose]))/@StringyReduction$X[n,opts]]
+Options[StringyReduction$X]={"Triangulation"->{},"cutoff"->{1,True},"F Polynomial"->StringyPolynomial,"Sort Function"->intX$PTshift$sort};
+Options[StringyRelations$X]={"Triangulation"->{},"cutoff"->{1,True},"F Polynomial"->StringyPolynomial,"Sort Function"->intX$PTshift$sort};
+StringyReduction$X[n_,opts:OptionsPattern[]]:=Once[DeleteCases[RowReduce[Once[Reverse[Coefficient[#,intXs$List[n,Sequence@@FilterRules[{opts},Options[intXs$List]]]]]&/@StringyIdentity$X$All[n,Sequence@@FilterRules[{opts},Options[StringyIdentity$X$All]]]]]//Simplify,{0..}]]
+StringyRelations$X[n_,opts:OptionsPattern[]]:=Once[(coeff|->FirstCase[#,{1,_}][[2]]==-Plus@@Times@@@Cases[#,Except[{0,_}]][[2;;]]&@({coeff,Reverse[intXs$List[n,Sequence@@FilterRules[{opts},Options[intXs$List]]]]}\[Transpose]))/@StringyReduction$X[n,opts]]
 
 
 Options[StringyAscendRules$X]={"Triangulation"->{},"cutoff"->{1,True},"F Polynomial"->StringyPolynomial};
-Options[StringyDescendRules$X]={"Triangulation"->{},"cutoff"->{1,True},"F Polynomial"->StringyPolynomial,"Sort Funtion"->intXshift$sort};
-StringyAscendRules$X[n_,opts:OptionsPattern[Options[StringyAscendRules$X]]]:=Once[Table[RuleDelayed@@{#[[1]]/.XctoPatternIf[Xij,Negative],#[[2]]/.XctoVarName}&@SelectStringyEquations$AscendX[Equal@@Solve[#,int@@Xvars[n]][[1,1]]&/@
+Options[StringyDescendRules$X]={"Triangulation"->{},"cutoff"->{1,True},"F Polynomial"->StringyPolynomial,"Sort Function"->intXshift$sort};
+StringyAscendRules$X[n_,opts:OptionsPattern[]]:=Once[Table[RuleDelayed@@{#[[1]]/.XctoPatternIf[Xij,Negative],#[[2]]/.XctoVarName}&@SelectStringyEquations$AscendX[Equal@@Solve[#,int@@Xvars[n]][[1,1]]&/@
 Select[#==0&/@StringyIdentity$X$All[n,opts],MemberQ[#,int@@Xvars[n],\[Infinity]]&],Xij][[1]],{Xij,Xvars[n]}]]
-StringyDescendRules$X[n_,opts:OptionsPattern[Options[StringyDescendRules$X]]]:=Once[(RuleDelayed@@{#1[[1]]/.#2/.XctoPatternIf[#2[[1,1]],(m|->(#>m&))[#3]],#1[[2]]/.#2/.XctoVarName}&)@@@
+StringyDescendRules$X[n_,opts:OptionsPattern[]]:=Once[(RuleDelayed@@{#1[[1]]/.#2/.XctoPatternIf[#2[[1,1]],(m|->(#>m&))[#3]],#1[[2]]/.#2/.XctoVarName}&)@@@
 (Append[#,Max[ExtractVariableFold[#[[1,2]],_int,#[[2,1,1]]+_,{_Integer,2}],0]]&@*(eq|->{eq,(#[[2]]->#[[2]]-#[[1]]&@*Sort/@List@@@Cases[eq[[1]],Subscript[X,__]+_])})/@
-SelectStringyEquations$noshift[StringyRelations$X[n,opts],PassOptions[opts,SelectStringyEquations$noshift]])]
+SelectStringyEquations$noshift[StringyRelations$X[n,PassOptions[opts,StringyDescendRules$X,StringyRelations$X]],PassOptions[opts,StringyDescendRules$X,SelectStringyEquations$noshift]])]
 
 
 Options[StringyRandomReduction$X]={"Triangulation"->{},"cutoff"->{1,False},"F Polynomial"->StringyPolynomial,"Max Range"->10,"Precision"->10^-10};
-StringyRandomReduction$X[n_,opts:OptionsPattern[Options[StringyRandomReduction$X]]]:=With[{ranMax=OptionValue["Max Range"],dx=OptionValue["Precision"]},DeleteCases[Rationalize[RowReduce[Once[Reverse[Coefficient[#,intXs$List[n,PassOptions[opts,intXs$List]]]]&/@
-StringyIdentity$X$All[n,PassOptions[opts,StringyIdentity$X$All]]]/.Table[Xij->RandomReal[{-ranMax,ranMax}],{Xij,Xvars[n]}]],dx],{0..}]]
+StringyRandomReduction$X[n_,opts:OptionsPattern[]]:=With[{ranMax=OptionValue["Max Range"],dx=OptionValue["Precision"]},DeleteCases[Rationalize[RowReduce[Once[Reverse[Coefficient[#,intXs$List[n,Sequence@@FilterRules[{opts},Options[intXs$List]]]]]&/@
+StringyIdentity$X$All[n,Sequence@@FilterRules[{opts},Options[StringyIdentity$X$All]]]]/.Table[Xij->RandomReal[{-ranMax,ranMax}],{Xij,Xvars[n]}]],dx],{0..}]]
 
 
 (************************ 5. Functions Part IV ***********************)
@@ -242,22 +263,22 @@ Once[Graph[Join[Table[Subscript["p",i],{i,n}],Table[Subscript["V",i],{i,n}]],Joi
 
 
 Options[uPath]={"Scaffolding"->False,"Ordering"->"Clockwise"};
-uPath[n_Integer,i_Integer,j_Integer,opts:OptionsPattern[Options[uPath]]]:=Once[With[{thisVi=If[OptionValue["Scaffolding"],Ceiling[i/2],i],ReverseOrNot=If[OptionValue["Ordering"]==="Clockwise",{},{"Left"->"Right","Right"->"Left"}],ifcycle=(i==j||(i-j==1&&EvenQ[i]&&OptionValue["Scaffolding"])),graph=Once[ToExpression["List"<>StringTake[FullForm[FeynGraph$1Loop[n,PassOptions[opts,FeynGraph$1Loop]]]//ToString,{6,-1}]]/.If[OptionValue["Ordering"]==="Clockwise",{},V1_\[DirectedEdge]V2_:>V2\[DirectedEdge]V1]]},
+uPath[n_Integer,i_Integer,j_Integer,opts:OptionsPattern[]]:=Once[With[{thisVi=If[OptionValue["Scaffolding"],Ceiling[i/2],i],ReverseOrNot=If[OptionValue["Ordering"]==="Clockwise",{},{"Left"->"Right","Right"->"Left"}],ifcycle=(i==j||(i-j==1&&EvenQ[i]&&OptionValue["Scaffolding"])),graph=Once[ToExpression["List"<>StringTake[FullForm[FeynGraph$1Loop[n,Sequence@@FilterRules[{opts},Options[FeynGraph$1Loop]]]]//ToString,{6,-1}]]/.If[OptionValue["Ordering"]==="Clockwise",{},V1_\[DirectedEdge]V2_:>V2\[DirectedEdge]V1]]},
 With[{edges=Once[List@@@graph[[3,1,2]]],pointPath=Once[If[!ifcycle,FindPath[Once[Graph@@graph],Subscript["p",i],Subscript["p",j],\[Infinity],All][[1]],If[FreeQ[#,{___,Subscript["V",a_],Subscript["V",b_],___}/;Mod[b-a-If[OptionValue["Ordering"]==="Clockwise",1,-1],n]==0],Reverse[#],#]&@Join[{Subscript["p",i],If[OptionValue["Scaffolding"],If[OddQ[i],Subscript["p",i,i+1],Subscript["p",i-1,i]],Nothing]},RotateLeft[#,Position[#,Subscript["V",thisVi]\[UndirectedEdge]_][[1,1]]-1]&@FindCycle[{Once[Graph@@(graph/.DirectedEdge->UndirectedEdge)],Subscript["V",thisVi]},\[Infinity],All][[1]]/.UndirectedEdge->Sequence,{If[OptionValue["Scaffolding"],If[OddQ[j],Subscript["p",j,j+1],Subscript["p",j-1,j]],Nothing],Subscript["p",j]}]//.{a___,b_,b_,c___}:>{a,b,c}]],
 LeftOrRight=({#1,#2,Switch[#2,{Subscript["p",a_],Subscript["p",a_,b_],Subscript["V",_]},"Right",{Subscript["p",b_],Subscript["p",a_,b_],Subscript["V",_]},"Left",{Subscript["p",__],Subscript["V",_],Subscript["V",_]},"Left"/.ReverseOrNot,{Subscript["V",_],Subscript["V",_],Subscript["V",_]},"Right"/.ReverseOrNot,{Subscript["V",_],Subscript["V",_],Subscript["p",__]},"Left"/.ReverseOrNot,{Subscript["V",_],Subscript["p",a_,b_],Subscript["p",a_]},"Left",{Subscript["V",_],Subscript["p",a_,b_],Subscript["p",b_]},"Right",{Subscript["p",a_],Subscript["p",a_,b_],Subscript["p",b_]},"Left",{Subscript["p",b_],Subscript["p",a_,b_],Subscript["p",a_]},"Right",_,"Fixed"]}&)},
 Table[LeftOrRight@@{Cases[Once[Union[edges,{Reverse[#[[1]]],#[[2]]}&/@Cases[edges,{_UndirectedEdge,_}]]],{_[pointPath[[$i]],pointPath[[$i+1]]],_}][[1,2]],If[$i<Length[pointPath]-1,{pointPath[[$i]],pointPath[[$i+1]],pointPath[[$i+2]]},{}]},{$i,Length[pointPath]-1}]]]]
-uPath[n_Integer,SuperPlus[i_]|SuperMinus[j_],opts:OptionsPattern[Options[uPath]]]:=With[{thisVi=If[OptionValue["Scaffolding"],Ceiling[(i+j)/2],i+j],upath=uPath[n,i,i,j,j,"Scaffolding"->OptionValue["Scaffolding"],"Ordering"->If[TrueQ[And[j]],"Clockwise","CounterClockwise"]],break=If[OptionValue["Scaffolding"],-3,-2]},Join[upath[[;;break-1]],{upath[[break]]/.{"Left"->"Right","Right"->"Left",Subscript["p",a_]:>Subscript["V",Mod[a+Sign[j/i],n,1]],Subscript["p",a_,b_]:>Subscript["V",Mod[b/2+Sign[j/i],n,1]]},{Subscript[y,Mod[thisVi+UnitStep[j/i],n,1]],{},"Fixed"}}]]
+uPath[n_Integer,SuperPlus[i_]|SuperMinus[j_],opts:OptionsPattern[]]:=With[{thisVi=If[OptionValue["Scaffolding"],Ceiling[(i+j)/2],i+j],upath=uPath[n,i,i,j,j,"Scaffolding"->OptionValue["Scaffolding"],"Ordering"->If[TrueQ[And[j]],"Clockwise","CounterClockwise"]],break=If[OptionValue["Scaffolding"],-3,-2]},Join[upath[[;;break-1]],{upath[[break]]/.{"Left"->"Right","Right"->"Left",Subscript["p",a_]:>Subscript["V",Mod[a+Sign[j/i],n,1]],Subscript["p",a_,b_]:>Subscript["V",Mod[b/2+Sign[j/i],n,1]]},{Subscript[y,Mod[thisVi+UnitStep[j/i],n,1]],{},"Fixed"}}]]
 
 
 Options[uPolynomial]={"Scaffolding"->False};
-uPolynomial[n_Integer,ij__Integer|k_SuperPlus|k_SuperMinus,opts:OptionsPattern[Options[uPolynomial]]]:=Once[#[[1,2]]#[[2,1]]/(#[[1,1]]#[[2,2]])&@(Dot@@(uPath[n,ij,k,opts]/.{{y_,_,"Left"}:>{{y,y},{0,1}},{y_,_,"Right"}:>{{y,0},{1,1}},{__,"Fixed"}->Nothing}/.{Subscript[y,a_,b_]/;Mod[b-a-1,If[OptionValue["Scaffolding"],2n,n]]==0->1}))]
-uPolynomial[n_Integer,Subscript[i_,\[Infinity]]|Subscript[j_,-\[Infinity]],opts:OptionsPattern[Options[uPolynomial]]]:=Once[With[{uMatrices={Dot@@#1[[;;#2-1]],Dot@@#1[[#2;;]]}&@@{uPath[n,If[TrueQ[And[j]],SuperPlus[i],SuperMinus[j]],opts][[;;-2]]/.{{y_,_,"Left"}:>{{y,y},{0,1}},{y_,_,"Right"}:>{{y,0},{1,1}}}/.{Subscript[y,a_,b_]/;Mod[b-a-1,If[OptionValue["Scaffolding"],2n,n]]==0->1},If[OptionValue["Scaffolding"],3,2]}},
+uPolynomial[n_Integer,ij__Integer|k_SuperPlus|k_SuperMinus,opts:OptionsPattern[]]:=Once[#[[1,2]]#[[2,1]]/(#[[1,1]]#[[2,2]])&@(Dot@@(uPath[n,ij,k,opts]/.{{y_,_,"Left"}:>{{y,y},{0,1}},{y_,_,"Right"}:>{{y,0},{1,1}},{__,"Fixed"}->Nothing}/.{Subscript[y,a_,b_]/;Mod[b-a-1,If[OptionValue["Scaffolding"],2n,n]]==0->1}))]
+uPolynomial[n_Integer,Subscript[i_,\[Infinity]]|Subscript[j_,-\[Infinity]],opts:OptionsPattern[]]:=Once[With[{uMatrices={Dot@@#1[[;;#2-1]],Dot@@#1[[#2;;]]}&@@{uPath[n,If[TrueQ[And[j]],SuperPlus[i],SuperMinus[j]],opts][[;;-2]]/.{{y_,_,"Left"}:>{{y,y},{0,1}},{y_,_,"Right"}:>{{y,0},{1,1}}}/.{Subscript[y,a_,b_]/;Mod[b-a-1,If[OptionValue["Scaffolding"],2n,n]]==0->1},If[OptionValue["Scaffolding"],3,2]}},
 With[{diag2=Diagonal[uMatrices[[2]]],nondiag2=uMatrices[[2]]-DiagonalMatrix[Diagonal[uMatrices[[2]]]]},Module[{m},Simplify[Together[#[[1,2]]#[[2,1]]/(#[[1,1]]#[[2,2]])&@(uMatrices[[1]] . (DiagonalMatrix[diag2^m]+(diag2[[2]]^m-diag2[[1]]^m)nondiag2/(diag2[[2]]-diag2[[1]])))]//.{Times[a_^m,b__]+c_/;FreeQ[c,m]:>c,a_^m+c_/;FreeQ[c,m]:>c}]]]]]
 
 
 Options[StringyIntegrand$XY]={"Scaffolding"->False,"Surfacehedron"->"Dn\[Infinity]"};
-StringyIntegrand$XY[n_Integer,opts:OptionsPattern[Options[StringyIntegrand$XY]]]:=Once[With[{m=If[OptionValue["Scaffolding"],2n,n]},PowerExpand[Product[If[#===0,1,#]&@uPolynomial[n,i,j,PassOptions[opts,uPolynomial]]^Subscript[X,i,j],{i,m},{j,m}]*
-If[StringContainsQ[OptionValue["Surfacehedron"],"inf"|"\[Infinity]",IgnoreCase->True],Product[uPolynomial[n,Subscript[i,-\[Infinity]],PassOptions[opts,uPolynomial]]^Subscript[OverTilde[Y],i],{i,m}],Product[uPolynomial[n,SuperPlus[i],PassOptions[opts,uPolynomial]]^Subscript[Y,i],{i,m}]Product[uPolynomial[n,SuperMinus[i],PassOptions[opts,uPolynomial]]^Subscript[OverTilde[Y],i],{i,m}]]/.a_Plus:>Factor[a]]]]
+StringyIntegrand$XY[n_Integer,opts:OptionsPattern[]]:=Once[With[{m=If[OptionValue["Scaffolding"],2n,n]},PowerExpand[Product[If[#===0,1,#]&@uPolynomial[n,i,j,Sequence@@FilterRules[{opts},Options[uPolynomial]]]^Subscript[X,i,j],{i,m},{j,m}]*
+If[StringContainsQ[OptionValue["Surfacehedron"],"inf"|"\[Infinity]",IgnoreCase->True],Product[uPolynomial[n,Subscript[i,-\[Infinity]],Sequence@@FilterRules[{opts},Options[uPolynomial]]]^Subscript[OverTilde[Y],i],{i,m}],Product[uPolynomial[n,SuperPlus[i],Sequence@@FilterRules[{opts},Options[uPolynomial]]]^Subscript[Y,i],{i,m}]Product[uPolynomial[n,SuperMinus[i],Sequence@@FilterRules[{opts},Options[uPolynomial]]]^Subscript[OverTilde[Y],i],{i,m}]]/.a_Plus:>Factor[a]]]]
 
 
 (*StringyIBP$5pt[expr_]:=Module[{AscendRules={
