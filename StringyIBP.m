@@ -17,12 +17,13 @@ StringyIBP$Version={"0.0.6","2024.5.7"};
 (* 0.0.1  2023.6.7   Add Part I~III of this package.
    0.0.2  2023.6.27  Add Part IV for loop integrand.
    0.0.3  2023.8.30  Change default triangulation.
-   0.0.4  2024.1.10  1.Add StringyReductionDataFF$X.
+   0.0.4  2024.1.10  1.Add interface for FiniteFlow.
                      2.Use Options to specify certain parameters.
    0.0.5  2024.4.25  1.Add scaffolding.
                      2.Use Dn\[Infinity] instead of Dn.
    0.0.6  2024.5.7   1.Add Parke-Taylor form.
-                     2.Rewrite Options passing.
+                     2.Add interface for syzygy.
+                     3.Rewrite Options passing.
 *)
 
 
@@ -78,7 +79,7 @@ ToString[progress]<>"/"<>ToString[Ceiling[Length[expr]/piecelength]]<>" terms ha
 
 
 Options[ParallelReplace]={"PieceLength"->500,Method->"CoarsestGrained"};
-ParallelReplace[expr:_List|_Integer,rules_,Optional[levelspec_?LevelSpecQ,All],OptionsPattern[]]:=With[{piecelength=OptionValue["PieceLength"]},Module[{progress=0,output},SetSharedVariable[progress];
+ParallelReplace[expr:_List|_Integer,rules_,levelspec:_?LevelSpecQ:All,OptionsPattern[]]:=With[{piecelength=OptionValue["PieceLength"]},Module[{progress=0,output},SetSharedVariable[progress];
 output=Monitor[ParallelTable[(progress++;Replace[expr[[piecelength i+1;;Min[piecelength(i+1),expr//Length]]],Dispatch[rules],levelspec]),{i,0,Ceiling[Length[expr]/piecelength]-1},Method->OptionValue[Method]],
 ToString[progress]<>"/"<>ToString[Ceiling[Length[expr]/piecelength]]<>" terms have been replaced."];
 If[Head[expr]===Plus,Plus@@output,output]]]
@@ -209,12 +210,14 @@ If[MemberQ[id,int[___,Subscript[c,__]],\[Infinity]],(id/.intXcRule)-If[IBPtag=!=
 (id/.intXRule)-If[IBPtag=!={},D[yi@IBPtag[[1,-1]]StringyIntegrand$X[n,opts],yi@IBPtag[[1,-1]]],0]]==0//Simplify]]]
 
 
-Options[StringyIdentity$X]={"Triangulation"->{}};
-Options[StringyIdentity$Xc]={"Triangulation"->{}};
-Options[StringyIdentity$X$shift]={"Triangulation"->{},"cutoff"->{1,True},"F Polynomial"->StringyPolynomial};
-Options[StringyIdentity$X$All]={"Triangulation"->{},"cutoff"->{1,True},"F Polynomial"->StringyPolynomial};
-StringyIdentity$X[n_,opts:OptionsPattern[]]:=Once[DeleteCases[Flatten[Table[Expand@TrivialIdentity$X[n,i,j,opts]==0,{i,1,n},{j,i,n}]]~Join~Flatten[Table[Expand@IBP$Identity$X[n,k,opts]==0,{k,n-3}]],True]]
-StringyIdentity$Xc[n_,opts:OptionsPattern[]]:=Once[DeleteCases[Flatten[Table[Expand@TrivialIdentity$Xc[n,i,j,opts]==0,{i,1,n},{j,i,n}]]~Join~Flatten[Table[Expand@IBP$Identity$Xc[n,k,opts]==0,{k,n-3}]],True]]
+Options[StringyIdentity$X]={"Triangulation"->{},"Collect int"->False,"F Polynomial"->StringyPolynomial};
+Options[StringyIdentity$Xc]={"Triangulation"->{},"Collect int"->False,"F Polynomial"->StringyPolynomial};
+Options[StringyIdentity$X$cyclic]={"Triangulation"->{},"Collect int"->False,"F Polynomial"->StringyPolynomial};
+Options[StringyIdentity$X$shift]={"Triangulation"->{},"Collect int"->False,"cutoff"->{1,True},"F Polynomial"->StringyPolynomial};
+Options[StringyIdentity$X$All]={"Triangulation"->{},"Collect int"->False,"cutoff"->{1,True},"F Polynomial"->StringyPolynomial};
+StringyIdentity$X[n_,opts:OptionsPattern[]]:=Once[With[{simplify=If[TrueQ@OptionValue["Collect int"],Collect[#,_int,Factor]&,Expand]},DeleteCases[Flatten[Table[simplify@TrivialIdentity$X[n,i,j,Sequence@@FilterRules[{opts},Options[TrivialIdentity$X]]]==0,{i,1,n},{j,i,n}]]~Join~Flatten[Table[simplify@IBP$Identity$X[n,k,Sequence@@FilterRules[{opts},Options[IBP$Identity$X]]]==0,{k,n-3}]],True]]]
+StringyIdentity$Xc[n_,opts:OptionsPattern[]]:=Once[With[{simplify=If[TrueQ@OptionValue["Collect int"],Collect[#,_int,Factor]&,Expand]},DeleteCases[Flatten[Table[simplify@TrivialIdentity$Xc[n,i,j,Sequence@@FilterRules[{opts},Options[TrivialIdentity$Xc]]]==0,{i,1,n},{j,i,n}]]~Join~Flatten[Table[simplify@IBP$Identity$Xc[n,k,Sequence@@FilterRules[{opts},Options[IBP$Identity$Xc]]]==0,{k,n-3}]],True]]]
+StringyIdentity$X$cyclic[n_,opts:OptionsPattern[]]:=Once[DeleteDuplicates[Table[Xc$cyclicPerm[(#[[1]]-#[[2]])&/@Once[StringyIdentity$X[n,Sequence@@FilterRules[{opts},Options[StringyIdentity$X]]]],n,m],{m,0,n-1}]//Flatten]]
 StringyIdentity$X$shift[n_,opts:OptionsPattern[]]:=Once[With[{k=OptionValue["cutoff"][[1]]},(#[[1]]-#[[2]])&/@FullSimplify[DeleteDuplicates[Select[Flatten@
 Table[eq/.Apply[Rule,{Xvars[n],Xvars[n]+#}\[Transpose]&/@Tuples[Range[0,k],n (n-3)/2],{2}],{eq,StringyIdentity$X[n,Sequence@@FilterRules[{opts},Options[StringyIdentity$X]]]}],intXshift$cutoff[#,Sequence@@FilterRules[{opts},Options[intXshift$cutoff]]]&]]]]]
 StringyIdentity$X$All[n_,opts:OptionsPattern[]]:=Once[DeleteDuplicates[Table[Xc$cyclicPerm[Once[StringyIdentity$X$shift[n,opts]],n,m],{m,0,n-1}]//Flatten]]
@@ -229,6 +232,11 @@ StringyReductionDataFF$X[n_,opts:OptionsPattern[]]:=With[{intXs=intXs$List[n,Seq
 With[{intXtoFF=Table[intXs[[$i]]->intFF[$i],{$i,Length[intXs]}]},{{Collect[#,_intFF]&/@(Join[#==0&/@StringyIdentity$X$All[n,Sequence@@FilterRules[{opts},Options[StringyIdentity$X$All]]],List@@OptionValue["Extra Equations"]]/.Dispatch[intXtoFF]),Reverse[intXtoFF[[All,2]]],"Parameters"->Xvars[n],"VarsPattern"->(Union[Cases[{#},_intFF,Infinity]]&)},Reverse/@intXtoFF}/.XctoVarName$FF]]
 
 
+Options[StringyReductionDataSyzygy$X]={"Triangulation"->{},"F Polynomial"->StringyPolynomial};
+StringyReductionDataSyzygy$X[n_,opts:OptionsPattern[]]:=With[{rules=Flatten@Table[StringJoin[sym,ToString/@List@@Xvars[n][[$i,2;;]]]->sym<>ToString[$i],{sym,{"n","z"}},{$i,n (n-3)/2}]},Module[{zeros,zz,nn},zeros=StringyIdentity$X$cyclic[n,opts]//.int[a___,Subscript[X,i_,j_]+k_,b___]:>(zz[i,j]^k) . int[a,Subscript[X,i,j],b]//.Times[Subscript[X,i_,j_],expr:_int|_Dot]:>expr . nn[i,j];If[Union@Cases[zeros,_int,\[Infinity]]==={int@@Xvars[n]},
+{StringReplace[ToString[SortBy[zeros/._int->1/.Dot[a___,1,b___]:>Dot[a,b]//.{Dot[a___,zz[i1_,j1_],nn[i2_,j2_],b___]/;{i1,j1}=!={i2,j2}:>Dot[a,nn[i2,j2],zz[i1,j1],b],Dot[a___,zz[i_,j_],nn[i_,j_],b___]:>Dot[a,nn[i,j],zz[i,j],b]+Dot[a,zz[i,j],b]},LeafCount]/.{zz[i_,j_]:>ToExpression["z"<>ToString[i]<>ToString[j]],nn[i_,j_]:>ToExpression["n"<>ToString[i]<>ToString[j]]}],Append[rules,"."->"*"]],Reverse/@rules},Print["Error."]]]]
+
+
 Options[StringyReduction$X]={"Triangulation"->{},"cutoff"->{1,True},"F Polynomial"->StringyPolynomial,"Sort Function"->intX$PTshift$sort};
 Options[StringyRelations$X]={"Triangulation"->{},"cutoff"->{1,True},"F Polynomial"->StringyPolynomial,"Sort Function"->intX$PTshift$sort};
 StringyReduction$X[n_,opts:OptionsPattern[]]:=Once[DeleteCases[RowReduce[Once[Reverse[Coefficient[#,intXs$List[n,Sequence@@FilterRules[{opts},Options[intXs$List]]]]]&/@StringyIdentity$X$All[n,Sequence@@FilterRules[{opts},Options[StringyIdentity$X$All]]]]]//Simplify,{0..}]]
@@ -241,7 +249,7 @@ StringyAscendRules$X[n_,opts:OptionsPattern[]]:=Once[Table[RuleDelayed@@{#[[1]]/
 Select[#==0&/@StringyIdentity$X$All[n,opts],MemberQ[#,int@@Xvars[n],\[Infinity]]&],Xij][[1]],{Xij,Xvars[n]}]]
 StringyDescendRules$X[n_,opts:OptionsPattern[]]:=Once[(RuleDelayed@@{#1[[1]]/.#2/.XctoPatternIf[#2[[1,1]],(m|->(#>m&))[#3]],#1[[2]]/.#2/.XctoVarName}&)@@@
 (Append[#,Max[ExtractVariableFold[#[[1,2]],_int,#[[2,1,1]]+_,{_Integer,2}],0]]&@*(eq|->{eq,(#[[2]]->#[[2]]-#[[1]]&@*Sort/@List@@@Cases[eq[[1]],Subscript[X,__]+_])})/@
-SelectStringyEquations$noshift[StringyRelations$X[n,PassOptions[opts,StringyDescendRules$X,StringyRelations$X]],PassOptions[opts,StringyDescendRules$X,SelectStringyEquations$noshift]])]
+SelectStringyEquations$noshift[StringyRelations$X[n,PassOptions[opts,StringyDescendRules$X,StringyRelations$X]],Sequence@@FilterRules[{opts},Options[SelectStringyEquations$noshift]]])]
 
 
 Options[StringyRandomReduction$X]={"Triangulation"->{},"cutoff"->{1,False},"F Polynomial"->StringyPolynomial,"Max Range"->10,"Precision"->10^-10};

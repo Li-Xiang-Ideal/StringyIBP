@@ -124,7 +124,12 @@ CheckStringyIdentity[IBP$Identity$Xc[5,1]]
 
 
 StringyIdentity$X[5](* identities directly obtained from expansion of p[y] or derivative of Subscript[y,i] *)
-StringyIdentity$Xc[5,"Triangulation" -> {Subscript[X,2,5],Subscript[X,3,5]}]
+StringyIdentity$X[5,"Collect int"->True]
+StringyIdentity$Xc[5,"Triangulation"->{Subscript[X,2,5],Subscript[X,3,5]}]
+
+
+StringyIdentity$X$cyclic[5](* cyclic of original identities *)
+StringyIdentity$X$cyclic[5,"Collect int"->True]
 
 
 StringyIdentity$X$shift[5](* various shift of original identities *)
@@ -139,6 +144,9 @@ intXs$List[5,"cutoff"->{2(* shift\[LessEqual]2 *),False(* disable single shift=2
 
 
 StringyReductionDataFF$X[5]
+
+
+StringyReductionDataSyzygy$X[5]
 
 
 (* ::Subsubsection:: *)
